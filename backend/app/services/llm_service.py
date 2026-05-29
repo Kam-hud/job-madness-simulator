@@ -170,12 +170,12 @@ class LLMService:
                 }
             }
         else:
-            # 聊天 API 格式 - 使用 v2 接口，非流式响应
+            # 聊天 API 格式 - 使用 v2 接口，非流式响应保证兼容性
             payload = {
                 "bot_id": self.coze_bot_id,  # 使用配置文件中的 bot_id
                 "user": "test_user",  # v2 接口使用 user 而不是 user_id
                 "query": user_input,  # v2 接口使用 query 而不是 additional_messages
-                "stream": False
+                "stream": False  # 非流式响应，确保兼容性
             }
 
         print(f"📡 API URL: {self.coze_url}")

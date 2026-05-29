@@ -1,4 +1,4 @@
-const API_BASE = '';
+const API_BASE = 'http://localhost:8000';
 
 let currentLevel = 1;
 let abilities = {
@@ -366,19 +366,32 @@ async function submitAction() {
         if (data.game_over) {
             showGameOver(data);
         } else {
-            // 更新关卡
-            if (data.current_level) {
-                updateLevel(data.current_level);
-            }
-            
-            // 延迟显示新挑战
+            // 延迟显示新挑战和更新关卡（等待用户看完点评）
             setTimeout(() => {
                 hideComment();
+                
+                // 更新关卡（包括侧边栏高亮）
+                if (data.current_level) {
+                    updateLevel(data.current_level);
+                    
+                    // 更新侧边栏高亮
+                    const timelineItems = document.querySelectorAll('.timeline-item');
+                    timelineItems.forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    const currentItem = document.querySelector(`.timeline-item[data-level="${data.current_level}"]`);
+                    if (currentItem) {
+                        currentItem.classList.add('active');
+                    }
+                }
+                
+                // 显示新挑战
                 if (data.current_event) {
                     displayChallenge(data.current_event);
                 }
+                
                 elements.playerInput.value = '';
-            }, 2500);
+            }, 10000); // 10秒后更新，让用户有足够时间阅读点评
         }
         
     } catch (error) {

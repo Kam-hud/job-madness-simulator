@@ -23,10 +23,10 @@ async def set_encoding_header(request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost", "http://127.0.0.1"],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["Content-Type"],
 )
 
