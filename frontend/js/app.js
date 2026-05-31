@@ -16,7 +16,10 @@ let skills = {
     public_speaking: 'locked'
 };
 
-let coins = 1000;
+// 【金币拆分】gameCoins 参与 AI 加减，rechargedCoins 充值保护不受 AI 影响
+let gameCoins = 1000;
+let rechargedCoins = 0;
+let lastBackendCoins = 1000;  // 追踪后端上次返回的金币值，用于计算 delta
 let elements = null;
 
 // 关卡历史记录，用于生成报告
@@ -228,7 +231,7 @@ async function startGame() {
         }
         
         if (data.coins !== undefined) {
-            updateCoins(data.coins);
+            initCoins(data.coins);
         }
         
     } catch (error) {
@@ -259,15 +262,15 @@ async function startGame() {
         updateSkills(mockData.skills);
         updateLevel(mockData.current_level);
         displayChallenge(mockData.current_event);
-        updateCoins(mockData.coins);
+        initCoins(mockData.coins);
         
         elements.challengeDescription.textContent = '(使用模拟数据) ' + mockData.current_event.description;
     }
 }
 
 async function submitAction() {
-    // 金币为0时阻止提交，引导充值
-    if (coins <= 0) {
+    // 金币为0时阻止提交，引导充值（显示总值 = 游戏金币 + 充值金币）
+    if (gameCoins + rechargedCoins <= 0) {
         showToast('职业金币不足，请先前往「充值中心」充值', 'error');
         return;
     }
@@ -283,13 +286,15 @@ async function submitAction() {
     elements.submitBtn.textContent = '策略实施中...';
     
     try {
+        const totalCoins = gameCoins + rechargedCoins;
         const response = await fetch(`${API_BASE}/api/action`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                player_input: input
+                player_input: input,
+                current_coins: totalCoins
             })
         });
         
@@ -366,9 +371,13 @@ async function submitAction() {
             }
         }
         
-        // 更新金币
+        // 更新金币（后端现在基于前端传来的值计算，返回的是权威值）
         if (data.coins !== undefined) {
-            updateCoins(data.coins);
+            gameCoins = data.coins;
+            rechargedCoins = 0;
+            lastBackendCoins = data.coins;
+            updateCoinsDisplay();
+            console.log(`💰 后端返回金币: ${data.coins}，已同步`);
         }
         
         // 更新能力值（从后端返回的数据中获取最新值）
@@ -388,7 +397,17 @@ async function submitAction() {
         
         // 检查游戏是否结束
         if (data.game_over) {
-            showGameOver(data);
+            // 记录最后一关数据，但不立即弹出报告
+            recordLevelHistory(data);
+            window._pendingGameOverData = data;
+            
+            // 点评已经在上方显示了，2秒后显示「查看成就报告」按钮
+            setTimeout(() => {
+                const reportBtn = document.getElementById('view-report-btn');
+                if (reportBtn) {
+                    reportBtn.style.display = 'block';
+                }
+            }, 2000);
         } else {
             // 延迟显示新挑战和更新关卡（等待用户看完点评）
             setTimeout(() => {
@@ -976,17 +995,41 @@ function closeReport() {
 // ============================================================
 
 function restartGame() {
+    // 关闭报告弹窗
     document.getElementById('modal-overlay').style.display = 'none';
+    // 清空输入框
     document.getElementById('player-input').value = '';
+    // 隐藏点评
     hideComment();
     
+    // 隐藏「查看成就报告」按钮
+    const viewReportBtn = document.getElementById('view-report-btn');
+    if (viewReportBtn) {
+        viewReportBtn.style.display = 'none';
+    }
+    
+    // 清除待处理的报告数据
+    window._pendingGameOverData = null;
+    
+    // 重置金币为初始值
+    gameCoins = 1000;
+    rechargedCoins = 0;
+    lastBackendCoins = 1000;
+    updateCoinsDisplay();
+    
+    // 重置能力值为初始值并同步 UI
     abilities = {
         core_business: 50,
         project_management: 50,
         team_influence: 50,
         strategic_depth: 50
     };
+    updateAbilityDisplay('core', 50, 0);
+    updateAbilityDisplay('project', 50, 0);
+    updateAbilityDisplay('team', 50, 0);
+    updateAbilityDisplay('strategy', 50, 0);
     
+    // 重置技能矩阵并同步 UI
     skills = {
         conflict: 'locked',
         eq: 'locked',
@@ -995,6 +1038,11 @@ function restartGame() {
         boundary: 'locked',
         public_speaking: 'locked'
     };
+    updateSkills(skills);
+    
+    // 重置当前关卡为 Level 1 并同步 UI
+    currentLevel = 1;
+    updateLevel(1);
 
     // 重置报告追踪数据
     levelHistory = [];
@@ -1002,6 +1050,23 @@ function restartGame() {
     evaluationScores = [];
     
     startGame();
+}
+
+// ============================================================
+// 查看成就报告（通关后手动触发）
+// ============================================================
+
+function showAchievementReport() {
+    const reportBtn = document.getElementById('view-report-btn');
+    if (reportBtn) {
+        reportBtn.style.display = 'none';
+    }
+    
+    const data = window._pendingGameOverData;
+    if (data) {
+        showGameOver(data);
+        window._pendingGameOverData = null;
+    }
 }
 
 // 【积分耗尽模式】激活倦怠状态
@@ -1232,6 +1297,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // 绑定报告相关事件
         bindReportEvents();
 
+        // 绑定查看成就报告按钮
+        const viewReportBtn = document.getElementById('view-report-btn');
+        if (viewReportBtn) {
+            viewReportBtn.addEventListener('click', showAchievementReport);
+        }
+
         // 测试模式检测
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('test') === 'report') {
@@ -1269,11 +1340,29 @@ function showToast(message, type) {
     }, 3000);
 }
 
-function updateCoins(amount) {
-    coins = Math.max(0, amount);
+// 更新金币显示（显示总值 = 游戏金币 + 充值金币）
+function updateCoinsDisplay() {
+    const total = gameCoins + rechargedCoins;
     if (elements.coinsValue) {
-        elements.coinsValue.textContent = coins;
+        elements.coinsValue.textContent = total;
     }
+}
+
+// 【兼容旧调用】后端返回金币时：计算 delta 只应用到 gameCoins，保护 rechargedCoins
+function applyBackendCoins(backendCoins) {
+    const delta = backendCoins - lastBackendCoins;
+    gameCoins = Math.max(0, gameCoins + delta);
+    lastBackendCoins = backendCoins;
+    updateCoinsDisplay();
+    console.log(`💰 后端金币: ${backendCoins} (delta: ${delta >= 0 ? '+' : ''}${delta}), gameCoins: ${gameCoins}, rechargedCoins: ${rechargedCoins}, 显示: ${gameCoins + rechargedCoins}`);
+}
+
+// 初始化金币（游戏开始时调用）
+function initCoins(backendCoins) {
+    gameCoins = backendCoins;
+    rechargedCoins = 0;
+    lastBackendCoins = backendCoins;
+    updateCoinsDisplay();
 }
 
 // ============================================================
@@ -1292,7 +1381,7 @@ function openRechargeModal() {
     if (!overlay) return;
 
     if (coinsDisplay) {
-        coinsDisplay.textContent = coins;
+        coinsDisplay.textContent = gameCoins + rechargedCoins;
     }
 
     selectedRecharge = { coins: 0, price: 0, payment: 'wechat' };
@@ -1365,7 +1454,8 @@ function submitRecharge() {
     showToast('正在拉起' + paymentLabel + '...', 'info');
 
     setTimeout(() => {
-        updateCoins(coins + selectedRecharge.coins);
+        rechargedCoins += selectedRecharge.coins;
+        updateCoinsDisplay();
         showToast('充值成功！+' + selectedRecharge.coins + ' 金币', 'success');
 
         if (submitBtn) {

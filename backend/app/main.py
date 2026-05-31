@@ -33,6 +33,7 @@ app.add_middleware(
 
 class ActionRequest(BaseModel):
     player_input: str
+    current_coins: int | None = None
 
 
 @app.get("/health")
@@ -48,7 +49,7 @@ async def start_game():
 @app.post("/api/action", response_class=UTF8JSONResponse)
 async def submit_action(request: ActionRequest):
     try:
-        return await game_manager.play_turn(request.player_input)
+        return await game_manager.play_turn(request.player_input, current_coins=request.current_coins)
     except Exception as e:
         import traceback
         print(f"❌ API 异常：{traceback.format_exc()}")

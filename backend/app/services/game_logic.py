@@ -68,8 +68,13 @@ class GameManager:
             "game_over": False
         }
 
-    async def play_turn(self, player_input: str) -> Dict[str, Any]:
+    async def play_turn(self, player_input: str, current_coins: int | None = None) -> Dict[str, Any]:
         """处理玩家回合"""
+        # 前端可能传入了当前金币值（含充值），以同步前后端状态
+        if current_coins is not None:
+            self.coins = current_coins
+            print(f"💰 前端同步金币：{self.coins}")
+
         # 记录历史
         self.history.append({
             "turn": self.current_turn,

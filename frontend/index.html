@@ -525,6 +525,34 @@
             transform: none;
         }
 
+        /* 查看成就报告按钮（通关后显示） */
+        .view-report-btn {
+            width: 100%;
+            padding: 20px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #1a1a2e;
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            text-shadow: none;
+            margin-bottom: 15px;
+            animation: fadeIn 0.5s ease, pulse-glow 2s ease-in-out infinite;
+        }
+
+        .view-report-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.5);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.7); }
+        }
+
         /* Skills Panel - Right Column */
         .skills-panel {
             background: var(--bg-card);
@@ -1829,6 +1857,11 @@
                     </div>
                     <div class="comment-content" id="comment-content"></div>
                 </div>
+
+                <!-- 查看成就报告按钮（通关后显示） -->
+                <button id="view-report-btn" class="view-report-btn" style="display:none;">
+                    🏆 查看成就报告
+                </button>
 
                 <div class="input-area">
                     <textarea 
