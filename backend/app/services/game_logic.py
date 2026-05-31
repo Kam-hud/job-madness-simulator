@@ -105,7 +105,7 @@ class GameManager:
 
             # 根据AI评价动态计算金币奖励
             coin_reward = self._calculate_coin_reward(evaluation.get("abilities_change", {}))
-            self.coins += coin_reward
+            self.coins = max(0, self.coins + coin_reward)
 
             # 检查是否通关
             if self.current_level >= 7:
@@ -166,7 +166,7 @@ class GameManager:
                 
                 # 根据AI评价动态计算金币奖励（兜底评价同样按质量计算）
                 coin_reward = self._calculate_coin_reward(fallback_eval.get("abilities_change", {}))
-                self.coins += coin_reward
+                self.coins = max(0, self.coins + coin_reward)
                 
                 evaluation_to_use = fallback_eval
 
