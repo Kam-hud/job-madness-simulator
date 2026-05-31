@@ -16,7 +16,25 @@ let skills = {
     public_speaking: 'locked'
 };
 
+let coins = 1000;
 let elements = null;
+
+// 关卡历史记录，用于生成报告
+let levelHistory = [];
+// 记录每个关卡的能力值快照
+let abilitySnapshots = [];
+// 记录每关的评价（用于判断高光时刻）
+let evaluationScores = [];
+
+const LEVEL_NAMES = {
+    1: { icon: '🛡️', name: '同事甩锅' },
+    2: { icon: '📋', name: '紧急任务' },
+    3: { icon: '💡', name: '战略视野' },
+    4: { icon: '🔗', name: '跨部门协作' },
+    5: { icon: '🔥', name: '客户危机' },
+    6: { icon: '👨‍💼', name: '团队管理' },
+    7: { icon: '🏆', name: '跨职能领导' }
+};
 
 const skillElements = {
     conflict: {
@@ -210,7 +228,7 @@ async function startGame() {
         }
         
         if (data.coins !== undefined) {
-            elements.coinsValue.textContent = data.coins;
+            updateCoins(data.coins);
         }
         
     } catch (error) {
@@ -241,13 +259,19 @@ async function startGame() {
         updateSkills(mockData.skills);
         updateLevel(mockData.current_level);
         displayChallenge(mockData.current_event);
-        elements.coinsValue.textContent = mockData.coins;
+        updateCoins(mockData.coins);
         
         elements.challengeDescription.textContent = '(使用模拟数据) ' + mockData.current_event.description;
     }
 }
 
 async function submitAction() {
+    // 金币为0时阻止提交，引导充值
+    if (coins <= 0) {
+        showToast('职业金币不足，请先前往「充值中心」充值', 'error');
+        return;
+    }
+
     const input = elements.playerInput.value.trim();
     
     if (!input) {
@@ -344,7 +368,7 @@ async function submitAction() {
         
         // 更新金币
         if (data.coins !== undefined) {
-            elements.coinsValue.textContent = data.coins;
+            updateCoins(data.coins);
         }
         
         // 更新能力值（从后端返回的数据中获取最新值）
@@ -369,7 +393,10 @@ async function submitAction() {
             // 延迟显示新挑战和更新关卡（等待用户看完点评）
             setTimeout(() => {
                 hideComment();
-                
+
+                // 【报告追踪】记录当前关卡完成数据
+                recordLevelHistory(data);
+
                 // 更新关卡（包括侧边栏高亮）
                 if (data.current_level) {
                     updateLevel(data.current_level);
@@ -404,26 +431,553 @@ async function submitAction() {
     elements.submitBtn.textContent = '⚡ 实施职业对策';
 }
 
-function showGameOver(data) {
-    elements.endingTitle.textContent = data.ending_title || '职业成就达成';
-    elements.finalLevel.textContent = `Level ${data.current_level || currentLevel}`;
-    elements.finalCore.textContent = Math.round(abilities.core_business);
-    elements.finalProject.textContent = Math.round(abilities.project_management);
-    elements.finalTeam.textContent = Math.round(abilities.team_influence);
-    elements.finalStrategy.textContent = Math.round(abilities.strategic_depth);
-    
-    let finalComment = data.ending_comment || '恭喜完成所有职业挑战！';
-    if (data.evaluation && data.evaluation.comment) {
-        finalComment = data.evaluation.comment;
-    }
-    elements.endingComment.textContent = finalComment;
-    
-    elements.modalOverlay.style.display = 'flex';
+// ============================================================
+// 报告数据追踪
+// ============================================================
+
+function recordLevelHistory(data) {
+    const comment = (data.evaluation && data.evaluation.comment) ? data.evaluation.comment : '';
+    const abilitiesChange = (data.evaluation && data.evaluation.abilities_change) 
+        ? data.evaluation.abilities_change : {};
+
+    const snapshot = {
+        core_business: abilities.core_business,
+        project_management: abilities.project_management,
+        team_influence: abilities.team_influence,
+        strategic_depth: abilities.strategic_depth
+    };
+    abilitySnapshots.push(snapshot);
+
+    // 计算正面评价得分（简单启发式：正面词汇加分）
+    let evalScore = 50; // 基础分
+    const positiveWords = ['出色', '优秀', '卓越', '很棒', '完美', '精彩', '厉害', '高明', '成熟', '专业', '冷静', '果断', '机智', '成功', '突破'];
+    const negativeWords = ['不足', '欠缺', '失败', '遗憾', '糟糕', '差劲', '失误', '冲动'];
+    positiveWords.forEach(w => { if (comment.includes(w)) evalScore += 8; });
+    negativeWords.forEach(w => { if (comment.includes(w)) evalScore -= 8; });
+    evalScore = Math.max(10, Math.min(100, evalScore));
+
+    const totalAbilityChange = Object.values(abilitiesChange).reduce((sum, v) => sum + (v || 0), 0);
+    evalScore += totalAbilityChange * 0.5;
+    evalScore = Math.round(Math.max(10, Math.min(100, evalScore)));
+
+    evaluationScores.push(evalScore);
+
+    levelHistory.push({
+        level: currentLevel,
+        title: LEVEL_NAMES[currentLevel] ? LEVEL_NAMES[currentLevel].name : `Level ${currentLevel}`,
+        icon: LEVEL_NAMES[currentLevel] ? LEVEL_NAMES[currentLevel].icon : '📌',
+        comment: comment,
+        evalScore: evalScore,
+        abilitiesChange: abilitiesChange,
+        abilitiesAfter: { ...snapshot }
+    });
 }
 
+// ============================================================
+// 游戏结束 - 展示报告
+// ============================================================
+
+function showGameOver(data) {
+    // 记录最后一关
+    if (levelHistory.length === 0 || levelHistory[levelHistory.length - 1].level !== currentLevel) {
+        recordLevelHistory(data);
+    }
+
+    // 如果 abilitySnapshots 为空，至少补充初始值
+    if (abilitySnapshots.length === 0) {
+        abilitySnapshots.push({
+            core_business: 50,
+            project_management: 50,
+            team_influence: 50,
+            strategic_depth: 50
+        });
+    }
+
+    const totalScore = Math.round(
+        (abilities.core_business + abilities.project_management +
+         abilities.team_influence + abilities.strategic_depth) / 4
+    );
+
+    // 填充头部
+    document.getElementById('report-player').textContent = '挑战者';
+    const now = new Date();
+    document.getElementById('report-time').textContent = 
+        `${now.getFullYear()}年${String(now.getMonth()+1).padStart(2,'0')}月${String(now.getDate()).padStart(2,'0')}日 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('report-total-score').textContent = totalScore;
+
+    // 绘制雷达图
+    renderRadarChart();
+
+    // 绘制关卡回顾
+    renderLevelReviews();
+
+    // 高光时刻
+    renderHighlight();
+
+    // 绘制成长轨迹
+    renderGrowthChart();
+
+    // 综合评价
+    renderSummary(data, totalScore);
+
+    // 发展建议
+    renderSuggestions(totalScore);
+
+    // 显示报告
+    document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+// ============================================================
+// 雷达图（纯 SVG）
+// ============================================================
+
+function renderRadarChart() {
+    const svg = document.getElementById('radar-svg');
+    const labels = ['核心业务', '项目管理', '团队影响', '战略思维'];
+    const values = [
+        abilities.core_business,
+        abilities.project_management,
+        abilities.team_influence,
+        abilities.strategic_depth
+    ];
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+    const cx = 150, cy = 150, r = 110;
+    const n = 4;
+
+    // 背景网格
+    let gridHtml = '';
+    for (let level = 1; level <= 5; level++) {
+        const lr = (r / 5) * level;
+        let points = '';
+        for (let i = 0; i < n; i++) {
+            const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+            const px = cx + lr * Math.cos(angle);
+            const py = cy + lr * Math.sin(angle);
+            points += `${px},${py} `;
+        }
+        gridHtml += `<polygon points="${points.trim()}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+    }
+
+    // 轴线
+    let axisHtml = '';
+    for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+        const px = cx + r * Math.cos(angle);
+        const py = cy + r * Math.sin(angle);
+        axisHtml += `<line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+    }
+
+    // 数据多边形
+    let dataPoints = '';
+    for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+        const vr = (r * values[i]) / 100;
+        const px = cx + vr * Math.cos(angle);
+        const py = cy + vr * Math.sin(angle);
+        dataPoints += `${px},${py} `;
+    }
+
+    // 数据点
+    let dotsHtml = '';
+    for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+        const vr = (r * values[i]) / 100;
+        const px = cx + vr * Math.cos(angle);
+        const py = cy + vr * Math.sin(angle);
+        dotsHtml += `<circle cx="${px}" cy="${py}" r="4" fill="${colors[i]}" stroke="#fff" stroke-width="1.5"/>`;
+    }
+
+    // 标签
+    let labelHtml = '';
+    for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+        const lx = cx + (r + 25) * Math.cos(angle);
+        const ly = cy + (r + 25) * Math.sin(angle);
+        const anchor = i === 0 ? 'middle' : (i === 2 ? 'middle' : (i === 1 ? 'start' : 'end'));
+        labelHtml += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#94a3b8" font-size="12" dominant-baseline="middle">${labels[i]}</text>`;
+    }
+
+    svg.innerHTML = gridHtml + axisHtml +
+        `<polygon points="${dataPoints.trim()}" fill="rgba(99,102,241,0.15)" stroke="rgba(99,102,241,0.6)" stroke-width="2"/>` +
+        dotsHtml + labelHtml;
+
+    // 图例
+    const legendDiv = document.getElementById('radar-legend');
+    legendDiv.innerHTML = labels.map((label, i) => `
+        <div class="radar-legend-item">
+            <span class="radar-legend-dot" style="background:${colors[i]}"></span>
+            <span>${label}</span>
+            <span class="radar-legend-value">${Math.round(values[i])}</span>
+        </div>
+    `).join('');
+}
+
+// ============================================================
+// 关卡回顾列表
+// ============================================================
+
+function renderLevelReviews() {
+    const container = document.getElementById('level-review-list');
+    const maxEval = Math.max(...evaluationScores, 1);
+    const highlightLevel = evaluationScores.indexOf(maxEval) + 1;
+
+    const items = levelHistory.map((h, idx) => {
+        const isHighlight = (idx + 1) === highlightLevel && h.evalScore >= 60;
+        const changes = h.abilitiesChange;
+        const changeItems = [];
+        const changeLabels = {
+            core_business: '核心',
+            project_management: '项目',
+            team_influence: '团队',
+            strategic_depth: '战略'
+        };
+        for (const [key, label] of Object.entries(changeLabels)) {
+            if (changes[key] && changes[key] !== 0) {
+                const dir = changes[key] > 0 ? 'up' : 'down';
+                const sign = changes[key] > 0 ? '+' : '';
+                changeItems.push(`<span class="level-review-change ${dir}">${label} ${sign}${changes[key]}</span>`);
+            }
+        }
+
+        return `
+            <div class="level-review-card${isHighlight ? ' highlight' : ''}">
+                <div class="level-review-icon">${h.icon}</div>
+                <div class="level-review-info">
+                    <div class="level-review-name">Lv${h.level} · ${h.title}</div>
+                    <div class="level-review-summary">${h.comment || '—— 完成挑战 ——'}</div>
+                </div>
+                <div class="level-review-changes">${changeItems.join('') || '<span style="color:#64748b;font-size:0.8rem">无变化</span>'}</div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = items.join('');
+}
+
+// ============================================================
+// 高光时刻
+// ============================================================
+
+function renderHighlight() {
+    const maxEval = Math.max(...evaluationScores, 1);
+    const idx = evaluationScores.indexOf(maxEval);
+    if (idx < 0 || levelHistory.length === 0) {
+        document.getElementById('highlight-section').style.display = 'none';
+        return;
+    }
+    document.getElementById('highlight-section').style.display = '';
+
+    const h = levelHistory[idx];
+    document.getElementById('highlight-card').innerHTML = `
+        <div class="highlight-badge">🌟</div>
+        <div class="highlight-title">Lv${h.level} · ${h.title}</div>
+        <div class="highlight-desc">${h.comment || '在这一关中，你展现了卓越的职业素养和应变能力，赢得了最高的评价。'}</div>
+    `;
+}
+
+// ============================================================
+// 成长轨迹折线图（纯 SVG）
+// ============================================================
+
+function renderGrowthChart() {
+    const svg = document.getElementById('growth-svg');
+    const w = 600, h = 240;
+    const pad = { top: 20, right: 30, bottom: 40, left: 40 };
+    const plotW = w - pad.left - pad.right;
+    const plotH = h - pad.top - pad.bottom;
+
+    const keys = ['core_business', 'project_management', 'team_influence', 'strategic_depth'];
+    const labels = ['核心业务', '项目管理', '团队影响', '战略思维'];
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+
+    if (abilitySnapshots.length < 2) {
+        svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#64748b" font-size="14">数据不足，无法绘制成长轨迹</text>`;
+        return;
+    }
+
+    // Y轴刻度
+    let yGrid = '';
+    for (let v = 0; v <= 100; v += 20) {
+        const y = pad.top + plotH - (plotH * v / 100);
+        yGrid += `<line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+        yGrid += `<text x="${pad.left - 8}" y="${y}" text-anchor="end" fill="#64748b" font-size="10" dominant-baseline="middle">${v}</text>`;
+    }
+
+    // X轴标签
+    let xLabels = '';
+    const stepX = abilitySnapshots.length > 1 ? plotW / (abilitySnapshots.length - 1) : plotW;
+    abilitySnapshots.forEach((_, i) => {
+        const x = pad.left + i * stepX;
+        xLabels += `<text x="${x}" y="${h - 8}" text-anchor="middle" fill="#64748b" font-size="10">Lv${i+1}</text>`;
+    });
+
+    // 折线
+    let lines = '';
+    keys.forEach((key, ki) => {
+        let pathD = '';
+        abilitySnapshots.forEach((snap, i) => {
+            const x = pad.left + i * stepX;
+            const y = pad.top + plotH - (plotH * snap[key] / 100);
+            pathD += (i === 0 ? 'M' : 'L') + `${x},${y} `;
+        });
+        lines += `<path d="${pathD.trim()}" fill="none" stroke="${colors[ki]}" stroke-width="2" stroke-linejoin="round"/>`;
+
+        // 数据点
+        abilitySnapshots.forEach((snap, i) => {
+            const x = pad.left + i * stepX;
+            const y = pad.top + plotH - (plotH * snap[key] / 100);
+            lines += `<circle cx="${x}" cy="${y}" r="3" fill="${colors[ki]}"/>`;
+            if (i === abilitySnapshots.length - 1) {
+                lines += `<text x="${x + 6}" y="${y - 6}" fill="${colors[ki]}" font-size="9">${Math.round(snap[key])}</text>`;
+            }
+        });
+    });
+
+    // 图例
+    let legendHtml = '';
+    keys.forEach((_, i) => {
+        legendHtml += `<rect x="${pad.left + i * 90}" y="${h - 4}" width="10" height="10" rx="2" fill="${colors[i]}"/>`;
+        legendHtml += `<text x="${pad.left + i * 90 + 14}" y="${h + 5}" fill="#94a3b8" font-size="10">${labels[i]}</text>`;
+    });
+
+    svg.innerHTML = yGrid + xLabels + lines + legendHtml;
+}
+
+// ============================================================
+// 综合评价 + 建议
+// ============================================================
+
+function renderSummary(data, totalScore) {
+    let grade, summary;
+    if (totalScore >= 85) {
+        grade = '卓越';
+        summary = '你在所有职业挑战中展现了非凡的领导力和应变能力。你的决策冷静、沟通高效、战略眼光独到，已经完全具备高级管理者的素养。';
+    } else if (totalScore >= 70) {
+        grade = '优秀';
+        summary = '你成功应对了大部分职业挑战，展现了扎实的业务功底和良好的团队协作能力。在某些关键时刻决策上还有提升空间。';
+    } else if (totalScore >= 55) {
+        grade = '良好';
+        summary = '你基本完成了挑战，在基础业务和团队沟通方面表现尚可，但在复杂局面下的战略决策和压力管理方面需要加强。';
+    } else {
+        grade = '成长中';
+        summary = '你在挑战中遇到了一些困难，这也是职业成长的必经之路。建议多积累实战经验，提升关键时刻的决策力和情绪管理能力。';
+    }
+
+    document.getElementById('report-summary').innerHTML = `
+        <strong style="color:#fbbf24;font-size:1.1rem;">评级：${grade}</strong><br><br>
+        ${summary}<br><br>
+        最终达到 Level ${currentLevel}，综合能力评分 <strong style="color:#fbbf24;">${totalScore}</strong> / 100。
+    `;
+}
+
+function renderSuggestions(totalScore) {
+    let suggestions = [];
+    const ab = abilities;
+
+    if (ab.core_business < 60) suggestions.push('加强核心业务能力的深度钻研，多参与实际项目积累经验。');
+    if (ab.project_management < 60) suggestions.push('提升项目管理能力，学习使用甘特图、看板等工具规划工作。');
+    if (ab.team_influence < 60) suggestions.push('增强团队协同影响力，主动承担团队协调角色，多倾听他人意见。');
+    if (ab.strategic_depth < 60) suggestions.push('培养战略思维深度，多阅读行业报告，从宏观视角审视问题。');
+
+    if (suggestions.length === 0) {
+        suggestions.push('你已经全面均衡发展，建议选择一个方向做更深层次的专精突破。');
+        suggestions.push('可以尝试承担更大规模的跨部门项目，锻炼综合领导力。');
+    }
+    suggestions.push('保持反思习惯，每次重要决策后记录思考过程，持续迭代优化。');
+
+    document.getElementById('report-suggestions').innerHTML = 
+        suggestions.map((s, i) => `<div style="margin-bottom:8px;">${i+1}. ${s}</div>`).join('');
+}
+
+// ============================================================
+// 导出报告（纯 JS - SVG foreignObject 方案）
+// ============================================================
+
+async function exportReport() {
+    const reportBody = document.getElementById('report-body');
+    const actionBar = document.querySelector('.report-action-bar');
+    const exportBtn = document.getElementById('export-btn');
+
+    try {
+        exportBtn.innerHTML = '<span>导出中...</span>';
+        exportBtn.disabled = true;
+
+        // 暂时隐藏操作按钮栏以避免出现在截图中
+        const origDisplay = actionBar.style.display;
+        actionBar.style.display = 'none';
+
+        // 克隆报告内容
+        const clone = reportBody.cloneNode(true);
+        clone.style.width = '800px';
+        clone.style.position = 'absolute';
+        clone.style.left = '-9999px';
+        clone.style.top = '0';
+        clone.style.backgroundColor = '#0f0f2a';
+        clone.style.padding = '30px 35px';
+        document.body.appendChild(clone);
+
+        // 使用 html2canvas 风格的方式：创建 SVG foreignObject
+        const htmlContent = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([`
+            <svg xmlns="http://www.w3.org/2000/svg" width="800" height="${clone.offsetHeight}">
+                <foreignObject width="800" height="${clone.offsetHeight}">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="
+                        background: linear-gradient(180deg, #0f0f2a 0%, #1a1a3e 50%, #151530 100%);
+                        color: #e0e0e0;
+                        font-family: 'ZCOOL KuaiLe', 'Ma Shan Zheng', cursive, sans-serif;
+                        padding: 30px 35px;
+                    ">
+                        ${htmlContent.replace(/<script[\s\S]*?<\/script>/g, '')}
+                    </div>
+                </foreignObject>
+            </svg>
+        `], { type: 'image/svg+xml;charset=utf-8' });
+
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = clone.offsetHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0f0f2a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            canvas.toBlob(function(pngBlob) {
+                const downloadUrl = URL.createObjectURL(pngBlob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `职业成就报告_${new Date().toISOString().slice(0,10)}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+
+                showToast('报告已导出为 PNG 图片', 'success');
+                exportBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>导出图片</span>';
+                exportBtn.disabled = false;
+            }, 'image/png');
+        };
+
+        img.onerror = function() {
+            // 降级方案：导出为 HTML 文件
+            fallbackExportHTML(clone, exportBtn);
+        };
+
+        img.src = url;
+
+        // 清理
+        document.body.removeChild(clone);
+        actionBar.style.display = origDisplay;
+
+    } catch (e) {
+        console.error('导出失败:', e);
+        showToast('导出失败，已尝试降级方案', 'error');
+        const exportBtn2 = document.getElementById('export-btn');
+        exportBtn2.innerHTML = '<span>导出图片</span>';
+        exportBtn2.disabled = false;
+    }
+}
+
+function fallbackExportHTML(clone, exportBtn) {
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>职业成就报告</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+    body { background:#0f0f2a; color:#e0e0e0; font-family:'ZCOOL KuaiLe',cursive,sans-serif; max-width:800px; margin:0 auto; padding:30px; }
+    ${document.querySelector('style').textContent}
+</style></head>
+<body>${clone.innerHTML}</body></html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `职业成就报告_${new Date().toISOString().slice(0,10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('已导出为 HTML 文件（降级方案）', 'info');
+    exportBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>导出图片</span>';
+    exportBtn.disabled = false;
+}
+
+// ============================================================
+// 分享功能
+// ============================================================
+
+function showSharePopup() {
+    const dropdown = document.getElementById('share-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('active');
+    }
+}
+
+function closeSharePopup() {
+    const dropdown = document.getElementById('share-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
+function copyReportText() {
+    let text = '=== 职业成就报告 ===\n\n';
+    text += `综合评分：${document.getElementById('report-total-score').textContent} / 100\n`;
+    text += `完成时间：${document.getElementById('report-time').textContent}\n\n`;
+
+    text += '【能力值】\n';
+    text += `核心业务能力：${Math.round(abilities.core_business)}\n`;
+    text += `项目管理矩阵：${Math.round(abilities.project_management)}\n`;
+    text += `团队协同影响力：${Math.round(abilities.team_influence)}\n`;
+    text += `战略思维深度：${Math.round(abilities.strategic_depth)}\n\n`;
+
+    text += '【关卡回顾】\n';
+    levelHistory.forEach(h => {
+        text += `Lv${h.level} ${h.title}：${h.comment || '完成挑战'}\n`;
+    });
+
+    text += '\n【综合评价】\n';
+    text += document.getElementById('report-summary').textContent.trim() + '\n';
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('报告文本已复制到剪贴板', 'success');
+        closeSharePopup();
+    }).catch(() => {
+        showToast('复制失败，请重试', 'error');
+    });
+}
+
+function copyShareLink() {
+    const fakeLink = `https://job-madness.app/report/${Date.now().toString(36)}`;
+    navigator.clipboard.writeText(fakeLink).then(() => {
+        showToast('链接已复制（模拟分享链接）', 'success');
+        closeSharePopup();
+    }).catch(() => {
+        showToast('复制失败，请重试', 'error');
+    });
+}
+
+// ============================================================
+// 关闭报告
+// ============================================================
+
+function closeReport() {
+    document.getElementById('modal-overlay').style.display = 'none';
+}
+
+// ============================================================
+// 重新开始
+// ============================================================
+
 function restartGame() {
-    elements.modalOverlay.style.display = 'none';
-    elements.playerInput.value = '';
+    document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('player-input').value = '';
     hideComment();
     
     abilities = {
@@ -441,6 +995,11 @@ function restartGame() {
         boundary: 'locked',
         public_speaking: 'locked'
     };
+
+    // 重置报告追踪数据
+    levelHistory = [];
+    abilitySnapshots = [];
+    evaluationScores = [];
     
     startGame();
 }
@@ -449,7 +1008,6 @@ function restartGame() {
 function activateBurnoutMode() {
     console.log('🔥 激活职业倦怠模式');
     
-    // 在顶部显示警告提示
     let burnoutWarning = document.getElementById('burnout-warning');
     if (!burnoutWarning) {
         burnoutWarning = document.createElement('div');
@@ -458,43 +1016,126 @@ function activateBurnoutMode() {
         burnoutWarning.innerHTML = `
             <div class="warning-content">
                 <span class="warning-icon">⚠️</span>
-                <span class="warning-text">当前职业动能不足，建议前往"职业资产包"获取加速器</span>
+                <span class="warning-text">当前职业动能不足，建议前往"职业资产包"进行充值</span>
             </div>
         `;
         document.querySelector('.container').insertBefore(burnoutWarning, document.querySelector('.container').firstChild);
     }
     
-    // 添加灰暗风格 class 到 body
     document.body.classList.add('burnout-mode');
     
-    // 让购买按钮闪烁
-    const purchaseBtn = document.querySelector('.purchase-btn');
-    if (purchaseBtn) {
-        purchaseBtn.classList.add('pulse-animation');
+    const rechargeBtn = document.querySelector('.recharge-card');
+    if (rechargeBtn) {
+        rechargeBtn.classList.add('pulse-animation');
     }
 }
 
-// 【积分耗尽模式】取消倦怠状态
 function deactivateBurnoutMode() {
     console.log('✅ 取消职业倦怠模式');
     
-    // 移除警告提示
     const burnoutWarning = document.getElementById('burnout-warning');
     if (burnoutWarning) {
         burnoutWarning.remove();
     }
     
-    // 移除灰暗风格 class
     document.body.classList.remove('burnout-mode');
     
-    // 移除购买按钮闪烁效果
-    const purchaseBtn = document.querySelector('.purchase-btn');
-    if (purchaseBtn) {
-        purchaseBtn.classList.remove('pulse-animation');
+    const rechargeBtn = document.querySelector('.recharge-card');
+    if (rechargeBtn) {
+        rechargeBtn.classList.remove('pulse-animation');
     }
 }
 
-// 页面加载完成后启动游戏
+// ============================================================
+// 测试模式：?test=report
+// ============================================================
+
+function activateTestMode() {
+    console.log('🧪 测试模式：报告已生成，点击右上角报告按钮查看');
+
+    // 模拟关卡历史数据
+    levelHistory = [
+        { level: 1, title: '同事甩锅', icon: '🛡️', comment: '你在会议上冷静地梳理了责任归属，用事实和数据说话，展现了出色的职业素养。', evalScore: 72, abilitiesChange: { core_business: 8, team_influence: 3 }, abilitiesAfter: { core_business: 58, project_management: 50, team_influence: 53, strategic_depth: 50 } },
+        { level: 2, title: '紧急任务', icon: '📋', comment: '面对突发任务，你快速排列优先级，展现了良好的时间管理和抗压能力。', evalScore: 78, abilitiesChange: { project_management: 10, core_business: 5 }, abilitiesAfter: { core_business: 63, project_management: 60, team_influence: 53, strategic_depth: 50 } },
+        { level: 3, title: '战略视野', icon: '💡', comment: '你对行业趋势的判断精准，提出的战略建议获得了高层的认可，表现出色！', evalScore: 88, abilitiesChange: { strategic_depth: 12, team_influence: 5 }, abilitiesAfter: { core_business: 63, project_management: 60, team_influence: 58, strategic_depth: 62 } },
+        { level: 4, title: '跨部门协作', icon: '🔗', comment: '你成功协调了三个部门的资源，项目按期交付，跨部门沟通能力显著提升。', evalScore: 82, abilitiesChange: { team_influence: 10, project_management: 8 }, abilitiesAfter: { core_business: 63, project_management: 68, team_influence: 68, strategic_depth: 62 } },
+        { level: 5, title: '客户危机', icon: '🔥', comment: '面对愤怒的客户，你保持了专业和冷静，最终化危机为机遇。', evalScore: 75, abilitiesChange: { core_business: 7, strategic_depth: 5 }, abilitiesAfter: { core_business: 70, project_management: 68, team_influence: 68, strategic_depth: 67 } },
+        { level: 6, title: '团队管理', icon: '👨‍💼', comment: '你带领团队在高压下完成了不可能的任务，展现了卓越的领导力和团队凝聚力！', evalScore: 92, abilitiesChange: { team_influence: 12, project_management: 8, core_business: 5 }, abilitiesAfter: { core_business: 75, project_management: 76, team_influence: 80, strategic_depth: 67 } },
+        { level: 7, title: '跨职能领导', icon: '🏆', comment: '你成功推动了公司级的战略转型项目，获得了全公司的认可，达到了职业新高度！', evalScore: 95, abilitiesChange: { strategic_depth: 15, core_business: 8, team_influence: 5, project_management: 5 }, abilitiesAfter: { core_business: 83, project_management: 81, team_influence: 85, strategic_depth: 82 } }
+    ];
+
+    evaluationScores = levelHistory.map(h => h.evalScore);
+    abilitySnapshots = [
+        { core_business: 50, project_management: 50, team_influence: 50, strategic_depth: 50 },
+        { core_business: 58, project_management: 50, team_influence: 53, strategic_depth: 50 },
+        { core_business: 63, project_management: 60, team_influence: 53, strategic_depth: 50 },
+        { core_business: 63, project_management: 60, team_influence: 58, strategic_depth: 62 },
+        { core_business: 63, project_management: 68, team_influence: 68, strategic_depth: 62 },
+        { core_business: 70, project_management: 68, team_influence: 68, strategic_depth: 67 },
+        { core_business: 75, project_management: 76, team_influence: 80, strategic_depth: 67 },
+        { core_business: 83, project_management: 81, team_influence: 85, strategic_depth: 82 }
+    ];
+
+    // 更新当前能力值
+    abilities = { core_business: 83, project_management: 81, team_influence: 85, strategic_depth: 82 };
+    currentLevel = 7;
+    updateAbilityDisplay('core', 83, 0);
+    updateAbilityDisplay('project', 81, 0);
+    updateAbilityDisplay('team', 85, 0);
+    updateAbilityDisplay('strategy', 82, 0);
+    updateLevel(7);
+
+    // 模拟 data 格式调 showGameOver
+    const mockData = {
+        game_over: true,
+        ending_title: '职业巅峰达成',
+        ending_comment: '恭喜！你已成功完成所有职业挑战，展现了全面的职业能力和领导力素养。',
+        current_level: 7,
+        evaluation: {
+            comment: '这是一段精彩的职业旅程！'
+        }
+    };
+
+    showGameOver(mockData);
+}
+
+// ============================================================
+// 绑定报告相关事件
+// ============================================================
+
+function bindReportEvents() {
+    const exportBtn = document.getElementById('export-btn');
+    const shareBtn = document.getElementById('share-btn');
+    const closeBtn = document.getElementById('report-close-btn');
+    const restartActionBtn = document.getElementById('restart-action-btn');
+    const shareCopyBtn = document.getElementById('share-copy-btn');
+    const shareLinkBtn = document.getElementById('share-link-btn');
+    const shareDropdown = document.getElementById('share-dropdown');
+
+    if (exportBtn) exportBtn.addEventListener('click', exportReport);
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showSharePopup();
+        });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closeReport);
+    if (restartActionBtn) restartActionBtn.addEventListener('click', restartGame);
+    if (shareCopyBtn) shareCopyBtn.addEventListener('click', copyReportText);
+    if (shareLinkBtn) shareLinkBtn.addEventListener('click', copyShareLink);
+
+    // 点击报告弹窗内其他地方关闭分享下拉
+    document.addEventListener('click', function(e) {
+        if (shareDropdown && shareDropdown.classList.contains('active')) {
+            const wrapper = document.getElementById('share-btn-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                closeSharePopup();
+            }
+        }
+    });
+}
+
+// 页面加载完成
 document.addEventListener('DOMContentLoaded', () => {
     console.log('📄 DOM 加载完成');
     
@@ -572,14 +1213,174 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        elements.restartBtn.addEventListener('click', restartGame);
-        
         elements.modalOverlay.addEventListener('click', (e) => {
             if (e.target === elements.modalOverlay) {
-                restartGame();
+                closeReport();
             }
         });
         
-        startGame();
+        // 充值弹窗遮罩层点击关闭
+        const rechargeOverlay = document.getElementById('recharge-modal-overlay');
+        if (rechargeOverlay) {
+            rechargeOverlay.addEventListener('click', (e) => {
+                if (e.target === rechargeOverlay) {
+                    closeRechargeModal();
+                }
+            });
+        }
+
+        // 绑定报告相关事件
+        bindReportEvents();
+
+        // 测试模式检测
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('test') === 'report') {
+            console.log('🧪 检测到测试模式参数 ?test=report');
+            // 延迟执行，确保所有初始化完成
+            setTimeout(() => {
+                activateTestMode();
+            }, 500);
+        } else {
+            startGame();
+        }
     }
 });
+
+// ============================================================
+// 加速器购买系统
+// ============================================================
+
+function showToast(message, type) {
+    const existingToast = document.querySelector('.game-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `game-toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.classList.add('toast-show');
+    });
+
+    setTimeout(() => {
+        toast.classList.remove('toast-show');
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
+}
+
+function updateCoins(amount) {
+    coins = Math.max(0, amount);
+    if (elements.coinsValue) {
+        elements.coinsValue.textContent = coins;
+    }
+}
+
+// ============================================================
+// 充值系统
+// ============================================================
+
+let selectedRecharge = {
+    coins: 0,
+    price: 0,
+    payment: 'wechat'
+};
+
+function openRechargeModal() {
+    const overlay = document.getElementById('recharge-modal-overlay');
+    const coinsDisplay = document.getElementById('recharge-current-coins');
+    if (!overlay) return;
+
+    if (coinsDisplay) {
+        coinsDisplay.textContent = coins;
+    }
+
+    selectedRecharge = { coins: 0, price: 0, payment: 'wechat' };
+    document.getElementById('recharge-total-price').textContent = '¥0.00';
+    document.getElementById('recharge-submit-btn').textContent = '确认支付';
+    document.getElementById('recharge-submit-btn').disabled = false;
+
+    document.querySelectorAll('.recharge-amount-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+
+    document.querySelectorAll('.recharge-payment-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    const wechatOpt = document.querySelector('.recharge-payment-option[onclick*="wechat"]');
+    if (wechatOpt) wechatOpt.classList.add('selected');
+
+    overlay.style.display = 'flex';
+}
+
+function closeRechargeModal() {
+    const overlay = document.getElementById('recharge-modal-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+    selectedRecharge = { coins: 0, price: 0, payment: 'wechat' };
+}
+
+function selectAmount(coinsAmount, price, element) {
+    document.querySelectorAll('.recharge-amount-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    element.classList.add('selected');
+
+    selectedRecharge.coins = coinsAmount;
+    selectedRecharge.price = price;
+
+    const totalDisplay = document.getElementById('recharge-total-price');
+    if (totalDisplay) {
+        totalDisplay.textContent = '¥' + price.toFixed(2);
+    }
+}
+
+function selectPayment(method, element) {
+    document.querySelectorAll('.recharge-payment-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    element.classList.add('selected');
+    selectedRecharge.payment = method;
+}
+
+function submitRecharge() {
+    if (selectedRecharge.coins === 0 || selectedRecharge.price === 0) {
+        showToast('请先选择充值金额', 'error');
+        return;
+    }
+
+    if (!selectedRecharge.payment) {
+        showToast('请选择支付方式', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('recharge-submit-btn');
+    if (submitBtn) {
+        submitBtn.textContent = '正在拉起支付...';
+        submitBtn.disabled = true;
+    }
+
+    const paymentLabel = selectedRecharge.payment === 'wechat' ? '微信支付' : '支付宝';
+    showToast('正在拉起' + paymentLabel + '...', 'info');
+
+    setTimeout(() => {
+        updateCoins(coins + selectedRecharge.coins);
+        showToast('充值成功！+' + selectedRecharge.coins + ' 金币', 'success');
+
+        if (submitBtn) {
+            submitBtn.textContent = '确认支付';
+            submitBtn.disabled = false;
+        }
+
+        closeRechargeModal();
+    }, 1500);
+}
+
+// 确保核心函数挂载到 window 对象，使 HTML onclick 属性能访问
+window.openRechargeModal = openRechargeModal;
+window.closeRechargeModal = closeRechargeModal;
+window.selectAmount = selectAmount;
+window.selectPayment = selectPayment;
+window.submitRecharge = submitRecharge;
+window.submitAction = submitAction;

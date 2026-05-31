@@ -859,3 +859,537 @@ body::before {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================================
+   职业成就报告 - 全新可视化布局
+   ============================================================ */
+
+.report-container {
+    background: linear-gradient(180deg, #0f0f2a 0%, #1a1a3e 50%, #151530 100%);
+    border: 2px solid rgba(99, 102, 241, 0.5);
+    border-radius: 20px;
+    max-width: 800px;
+    width: 94%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modal-appear 0.5s ease;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.7);
+}
+
+.report-container::-webkit-scrollbar {
+    width: 6px;
+}
+.report-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+.report-container::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 3px;
+}
+
+/* 操作按钮栏 */
+.report-action-bar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    position: sticky;
+    top: 0;
+    background: rgba(15, 15, 42, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    border-radius: 20px 20px 0 0;
+}
+
+.report-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 10px;
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.report-action-btn:hover {
+    background: rgba(99, 102, 241, 0.3);
+    border-color: rgba(99, 102, 241, 0.7);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+.report-action-btn.export-btn:hover {
+    background: rgba(16, 185, 129, 0.3);
+    border-color: rgba(16, 185, 129, 0.7);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.report-action-btn.share-btn:hover {
+    background: rgba(245, 158, 11, 0.3);
+    border-color: rgba(245, 158, 11, 0.7);
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+
+.report-action-btn.close-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.7);
+}
+
+/* 报告主体 */
+.report-body {
+    padding: 30px 35px;
+}
+
+/* 头部 */
+.report-header {
+    text-align: center;
+    padding: 20px 0 30px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    margin-bottom: 25px;
+}
+
+.report-main-title {
+    font-size: 2.2rem;
+    font-weight: bold;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 12px;
+    letter-spacing: 4px;
+}
+
+.report-meta {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.report-divider {
+    margin: 0 10px;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.report-total-score-wrap {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 16px 36px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 16px;
+}
+
+.report-total-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.report-total-score {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #fbbf24;
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+    line-height: 1;
+}
+
+.report-total-unit {
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+/* 章节 */
+.report-section {
+    margin-bottom: 30px;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(99, 102, 241, 0.12);
+    border-radius: 14px;
+}
+
+.report-section-title {
+    font-size: 1.15rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 0 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+/* 雷达图 */
+.radar-chart-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.radar-svg {
+    width: 260px;
+    height: 260px;
+}
+
+.radar-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.radar-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.radar-legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.radar-legend-value {
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-left: auto;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* 关卡回顾列表 */
+.level-review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.level-review-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.level-review-card:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+.level-review-card.highlight {
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.06);
+    position: relative;
+}
+
+.level-review-card.highlight::before {
+    content: '★ 高光时刻';
+    position: absolute;
+    top: -10px;
+    right: 16px;
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    color: #1a1a2e;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 3px 10px;
+    border-radius: 10px;
+}
+
+.level-review-icon {
+    font-size: 1.8rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.level-review-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.level-review-name {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.level-review-summary {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.level-review-changes {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.level-review-change {
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.level-review-change.up {
+    color: var(--success-color);
+    background: rgba(16, 185, 129, 0.15);
+}
+
+.level-review-change.down {
+    color: var(--danger-color);
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* 高光时刻卡片 */
+.highlight-card {
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.05));
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 14px;
+    text-align: center;
+}
+
+.highlight-badge {
+    display: inline-block;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    animation: bounce 2s ease-in-out infinite;
+}
+
+.highlight-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #fbbf24;
+    margin-bottom: 8px;
+}
+
+.highlight-desc {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+/* 成长轨迹折线图 */
+.growth-chart-wrap {
+    overflow-x: auto;
+}
+
+.growth-svg {
+    width: 100%;
+    min-width: 500px;
+    height: auto;
+}
+
+/* 综合评价 */
+.report-summary {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border-left: 3px solid var(--primary-color);
+}
+
+/* 发展建议 */
+.report-suggestions {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    padding: 16px;
+    background: rgba(16, 185, 129, 0.05);
+    border-radius: 10px;
+    border-left: 3px solid var(--success-color);
+}
+
+/* 报告底部 */
+.report-footer {
+    padding: 20px 35px 30px;
+    text-align: center;
+}
+
+/* 分享弹窗 */
+.share-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(6px);
+}
+
+.share-overlay.active {
+    display: flex;
+}
+
+.share-popup {
+    background: linear-gradient(180deg, #1e1e3a, #151530);
+    border: 2px solid rgba(99, 102, 241, 0.4);
+    border-radius: 16px;
+    width: 380px;
+    max-width: 92%;
+    animation: modal-appear 0.3s ease;
+}
+
+.share-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 22px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.share-popup-header h3 {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.share-popup-close {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    font-size: 1.3rem;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.share-popup-close:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+}
+
+.share-popup-body {
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.share-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.share-option-btn:hover {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateX(3px);
+}
+
+.share-option-icon {
+    font-size: 1.4rem;
+}
+
+/* Toast 消息 */
+.game-toast {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    color: #fff;
+    z-index: 9999;
+    opacity: 0;
+    transition: all 0.4s ease;
+    pointer-events: none;
+    font-family: inherit;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-toast.toast-show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.game-toast.toast-success {
+    background: rgba(16, 185, 129, 0.85);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.game-toast.toast-error {
+    background: rgba(239, 68, 68, 0.85);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.game-toast.toast-info {
+    background: rgba(59, 130, 246, 0.85);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* 响应式：报告 */
+@media (max-width: 700px) {
+    .report-body {
+        padding: 20px;
+    }
+    .report-main-title {
+        font-size: 1.6rem;
+    }
+    .report-total-score {
+        font-size: 2.2rem;
+    }
+    .level-review-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .level-review-changes {
+        align-self: flex-end;
+    }
+    .radar-chart-wrap {
+        flex-direction: column;
+    }
+    .report-action-bar {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}

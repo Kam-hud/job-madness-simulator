@@ -103,8 +103,9 @@ class GameManager:
             # 更新技能矩阵
             self._update_skills(evaluation.get("skills_matrix", {}))
 
-            # 增加金币奖励
-            self.coins += 100
+            # 根据AI评价动态计算金币奖励
+            coin_reward = self._calculate_coin_reward(evaluation.get("abilities_change", {}))
+            self.coins += coin_reward
 
             # 检查是否通关
             if self.current_level >= 7:
@@ -163,8 +164,9 @@ class GameManager:
                 # 更新技能矩阵（使用动态兜底数据）
                 self._update_skills(fallback_eval.get("skills_matrix", {}))
                 
-                # 增加金币奖励
-                self.coins += 100
+                # 根据AI评价动态计算金币奖励（兜底评价同样按质量计算）
+                coin_reward = self._calculate_coin_reward(fallback_eval.get("abilities_change", {}))
+                self.coins += coin_reward
                 
                 evaluation_to_use = fallback_eval
 
@@ -200,6 +202,19 @@ class GameManager:
         for key in ["conflict", "eq", "negotiation", "mobilization", "boundary", "public_speaking"]:
             if key in skills_matrix:
                 self.skills[key] = skills_matrix[key]
+
+    def _calculate_coin_reward(self, abilities_change: Dict[str, int]) -> int:
+        """根据AI评价的能力变化动态计算金币奖惩"""
+        net_change = sum(abilities_change.values())
+        if net_change > 0:
+            # 正面评价：能力上升 → 金币奖励 +50~+200
+            return max(50, min(200, 50 + int(net_change * 7.5)))
+        elif net_change < 0:
+            # 负面评价：能力下降 → 金币扣除 -30~-100
+            return -max(30, min(1000, 30 + int(abs(net_change) * 3.5)))
+        else:
+            # 中性评价：保底 +50
+            return 50
 
     def _create_game_over_response(self, evaluation: Dict[str, Any], success: bool = True) -> Dict[str, Any]:
         """创建游戏结束响应"""
