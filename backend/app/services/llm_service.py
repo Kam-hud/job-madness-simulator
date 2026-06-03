@@ -631,10 +631,18 @@ class LLMService:
                 # _call_coze_api 现在直接返回解析后的字典
                 parsed_result = await self._call_coze_api(prompt)
 
-                parsed_result.setdefault('level', level)
-                parsed_result.setdefault('title', f'Level {level} - 职场挑战')
-                parsed_result.setdefault('description', '新的挑战来临...')
-                parsed_result.setdefault('difficulty', min(level, 7))
+                parsed_result['level'] = level
+                parsed_result['difficulty'] = min(level, 7)
+
+                # 强制修正标题中的关卡号
+                original_title = parsed_result.get('title', '')
+                parsed_result['title'] = f"Level {level} - {scenario_def['theme']}"
+
+                # 校验描述是否匹配当前关卡主题，如果不匹配则重试一次
+                theme = scenario_def['theme']
+                if theme not in original_title and attempt == 0:
+                    print(f"场景主题不匹配，重试...")
+                    continue
 
                 print(f"✅ 事件生成成功: {parsed_result['title']}")
                 return parsed_result

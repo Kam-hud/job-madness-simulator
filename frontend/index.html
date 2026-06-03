@@ -525,7 +525,7 @@
             transform: none;
         }
 
-        /* 查看成就报告按钮（通关后显示） */
+        
         .view-report-btn {
             width: 100%;
             padding: 20px 30px;
@@ -682,7 +682,7 @@
             color: var(--text-muted);
         }
 
-        /* 充值卡片 */
+        
         .recharge-card {
             display: flex;
             align-items: center;
@@ -859,9 +859,7 @@
             box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
         }
 
-        /* ============================================================
-           职业成就报告弹窗样式
-           ============================================================ */
+        
         .report-container {
             background: linear-gradient(180deg, #0f0f2a 0%, #1a1a3e 50%, #151530 100%);
             border: 2px solid var(--border-color);
@@ -876,7 +874,7 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
         }
 
-        /* 顶部操作栏 — sticky 吸顶 */
+        
         .report-action-bar {
             display: flex;
             align-items: center;
@@ -919,7 +917,7 @@
             flex-shrink: 0;
         }
 
-        /* 重新挑战按钮 — 金色醒目 */
+        
         .restart-action-btn {
             background: linear-gradient(135deg, #f59e0b, #fbbf24);
             color: #1a1a2e;
@@ -941,7 +939,7 @@
             flex: 1;
         }
 
-        /* 关闭按钮（X） */
+        
         .report-close-x {
             display: inline-flex;
             align-items: center;
@@ -967,7 +965,7 @@
             color: #fca5a5;
         }
 
-        /* 报告正文 — 可滚动 */
+        
         .report-body {
             flex: 1;
             overflow-y: auto;
@@ -975,13 +973,24 @@
             color: #e0e0e0;
         }
 
+        
         .report-body::-webkit-scrollbar {
-            width: 6px;
+            width: 0;
+            background: transparent;
+        }
+        .report-body {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
         }
 
-        .report-body::-webkit-scrollbar-thumb {
-            background: rgba(139, 92, 246, 0.3);
-            border-radius: 3px;
+        
+        *::-webkit-scrollbar {
+            width: 0;
+            background: transparent;
+        }
+        * {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
         }
 
         .report-header {
@@ -1052,7 +1061,7 @@
             border-left: 3px solid var(--accent-purple);
         }
 
-        /* 雷达图 */
+        
         .radar-chart-wrap {
             display: flex;
             align-items: center;
@@ -1093,7 +1102,7 @@
             margin-left: 4px;
         }
 
-        /* 关卡回顾 */
+        
         .level-review-list {
             display: flex;
             flex-direction: column;
@@ -1170,7 +1179,7 @@
             color: var(--accent-red);
         }
 
-        /* 高光时刻 */
+        
         .highlight-card {
             text-align: center;
             padding: 24px;
@@ -1197,7 +1206,7 @@
             line-height: 1.7;
         }
 
-        /* 成长轨迹图 */
+        
         .growth-chart-wrap {
             width: 100%;
             overflow-x: auto;
@@ -1208,7 +1217,7 @@
             min-width: 500px;
         }
 
-        /* 综合评价 & 建议 */
+        
         .report-summary,
         .report-suggestions {
             font-size: 0.95rem;
@@ -1219,7 +1228,7 @@
             border-radius: 12px;
         }
 
-        /* 分享下拉菜单 — 在报告弹窗内 */
+        
         .share-dropdown {
             position: absolute;
             top: 100%;
@@ -1266,7 +1275,7 @@
             text-align: center;
         }
 
-        /* 分享按钮容器 — relative 定位 */
+        
         .share-btn-wrapper {
             position: relative;
         }
@@ -1349,7 +1358,7 @@
             }
         }
         
-        /* 【积分耗尽模式】倦怠警告提示 */
+        
         .burnout-warning {
             background: linear-gradient(135deg, #ef4444, #f97316);
             border-radius: 15px;
@@ -1387,7 +1396,7 @@
             50% { transform: scale(1.2); opacity: 0.8; }
         }
         
-        /* 【积分耗尽模式】灰暗风格 */
+        
         body.burnout-mode {
             filter: grayscale(0.6) brightness(0.8);
         }
@@ -1404,7 +1413,7 @@
             z-index: 0;
         }
         
-        /* 【积分耗尽模式】购买按钮闪烁动画 */
+        
         @keyframes pulse-animation {
             0%, 100% {
                 transform: scale(1);
@@ -1420,7 +1429,7 @@
             animation: pulse-animation 1.5s ease-in-out infinite;
         }
         
-        /* Toast 提示 */
+        
         .game-toast {
             position: fixed;
             top: 30px;
@@ -1459,7 +1468,7 @@
             box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4);
         }
 
-        /* 充值弹窗 */
+        
         .recharge-modal-overlay {
             position: fixed;
             top: 0;
@@ -1688,6 +1697,7 @@
             transform: translateY(0);
         }
     </style>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -1853,12 +1863,12 @@
                 <div class="comment-box" id="comment-box">
                     <div class="comment-header">
                         <span class="comment-icon">💬</span>
-                        <span class="comment-label">高管点评</span>
+                        <span class="comment-label">AI点评</span>
                     </div>
                     <div class="comment-content" id="comment-content"></div>
                 </div>
 
-                <!-- 查看成就报告按钮（通关后显示） -->
+                
                 <button id="view-report-btn" class="view-report-btn" style="display:none;">
                     🏆 查看成就报告
                 </button>
@@ -1933,10 +1943,10 @@
             </div>
         </div>
 
-        <!-- 职业成就报告模态框 -->
+        
         <div class="modal-overlay" id="modal-overlay">
             <div class="report-container" id="report-container">
-                <!-- 顶部操作栏：导出 | 分享 | spacer | 重新挑战 | 关闭 -->
+                
                 <div class="report-action-bar" id="report-action-bar">
                     <button class="report-action-btn export-btn" id="export-btn" title="导出报告为PNG图片">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1946,29 +1956,6 @@
                         </svg>
                         <span>导出图片</span>
                     </button>
-                    <!-- 分享按钮 + 下拉菜单 -->
-                    <div class="share-btn-wrapper" id="share-btn-wrapper">
-                        <button class="report-action-btn share-btn" id="share-btn" title="分享报告">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="18" cy="5" r="3"></circle>
-                                <circle cx="6" cy="12" r="3"></circle>
-                                <circle cx="18" cy="19" r="3"></circle>
-                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                            </svg>
-                            <span>分享</span>
-                        </button>
-                        <div class="share-dropdown" id="share-dropdown">
-                            <button class="share-dropdown-item" id="share-copy-btn">
-                                <span class="share-dropdown-icon">📋</span>
-                                <span>复制报告文本</span>
-                            </button>
-                            <button class="share-dropdown-item" id="share-link-btn">
-                                <span class="share-dropdown-icon">🔗</span>
-                                <span>复制分享链接</span>
-                            </button>
-                        </div>
-                    </div>
                     <div class="report-action-spacer"></div>
                     <button class="report-action-btn restart-action-btn" id="restart-action-btn" title="重新开始挑战">
                         ⚡ 重新挑战
@@ -1977,7 +1964,7 @@
                 </div>
 
                 <div class="report-body" id="report-body">
-                    <!-- 头部 -->
+                    
                     <div class="report-header">
                         <h1 class="report-main-title">职业成就报告</h1>
                         <div class="report-meta">
@@ -1992,44 +1979,44 @@
                         </div>
                     </div>
 
-                    <!-- 雷达图区域 -->
+                    
                     <div class="report-section">
                         <h2 class="report-section-title">能力雷达图</h2>
                         <div class="radar-chart-wrap" id="radar-chart-wrap">
                             <svg viewBox="0 0 300 300" class="radar-svg" id="radar-svg">
-                                <!-- 由 JS 动态填充 -->
+                                
                             </svg>
                             <div class="radar-legend" id="radar-legend"></div>
                         </div>
                     </div>
 
-                    <!-- 关卡回顾 -->
+                    
                     <div class="report-section">
                         <h2 class="report-section-title">关卡回顾</h2>
                         <div class="level-review-list" id="level-review-list">
-                            <!-- 由 JS 动态填充 -->
+                            
                         </div>
                     </div>
 
-                    <!-- 高光时刻 -->
+                    
                     <div class="report-section" id="highlight-section">
                         <h2 class="report-section-title">高光时刻</h2>
                         <div class="highlight-card" id="highlight-card">
-                            <!-- 由 JS 动态填充 -->
+                            
                         </div>
                     </div>
 
-                    <!-- 成长轨迹 -->
+                    
                     <div class="report-section">
                         <h2 class="report-section-title">能力成长轨迹</h2>
                         <div class="growth-chart-wrap">
                             <svg viewBox="0 0 600 240" class="growth-svg" id="growth-svg">
-                                <!-- 由 JS 动态填充 -->
+                                
                             </svg>
                         </div>
                     </div>
 
-                    <!-- 底部：总评 + 建议 -->
+                    
                     <div class="report-section">
                         <h2 class="report-section-title">综合评价</h2>
                         <div class="report-summary" id="report-summary"></div>
@@ -2042,7 +2029,7 @@
             </div>
         </div>
 
-        <!-- 充值弹窗 -->
+        
         <div class="recharge-modal-overlay" id="recharge-modal-overlay">
             <div class="recharge-modal">
                 <div class="recharge-modal-header">
@@ -2107,5 +2094,63 @@
     </div>
 
     <script src="js/app.js?v=20"></script>
+    
+    
+    <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+        <button id="debug-report-btn" 
+                style="padding: 12px 20px; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none; border-radius: 10px; font-family: inherit; font-weight: bold; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4); transition: all 0.3s ease;"
+                onclick="window.showTestReport()"
+                title="点击预览报告界面，方便测试导出和分享功能">
+            🧪 预览报告
+        </button>
+    </div>
+
+    <script>
+        window.showTestReport = function() {
+            console.log('🧪 [调试模式] 显示报告界面');
+
+            const mockData = {
+                game_over: true,
+                ending_title: '职业巅峰达成',
+                ending_comment: '恭喜！你已成功完成所有职业挑战，展现了全面的职业能力和领导力素养。',
+                current_level: 7,
+                evaluation: {
+                    comment: '这是一段精彩的职业旅程！'
+                }
+            };
+
+            window.levelHistory = [
+                { level: 1, title: '同事甩锅', icon: '🛡️', comment: '你在会议上冷静地梳理了责任归属，用事实和数据说话，展现了出色的职业素养。', evalScore: 72, abilitiesChange: { core_business: 8, team_influence: 3 }, abilitiesAfter: { core_business: 58, project_management: 50, team_influence: 53, strategic_depth: 50 } },
+                { level: 2, title: '紧急任务', icon: '📋', comment: '面对突发任务，你快速排列优先级，展现了良好的时间管理和抗压能力。', evalScore: 78, abilitiesChange: { project_management: 10, core_business: 5 }, abilitiesAfter: { core_business: 63, project_management: 60, team_influence: 53, strategic_depth: 50 } },
+                { level: 3, title: '战略视野', icon: '💡', comment: '你对行业趋势的判断精准，提出的战略建议获得了高层的认可，表现出色！', evalScore: 88, abilitiesChange: { strategic_depth: 12, team_influence: 5 }, abilitiesAfter: { core_business: 63, project_management: 60, team_influence: 58, strategic_depth: 62 } },
+                { level: 4, title: '跨部门协作', icon: '🔗', comment: '你成功协调了三个部门的资源，项目按期交付，跨部门沟通能力显著提升。', evalScore: 82, abilitiesChange: { team_influence: 10, project_management: 8 }, abilitiesAfter: { core_business: 63, project_management: 68, team_influence: 68, strategic_depth: 62 } },
+                { level: 5, title: '客户危机', icon: '🔥', comment: '面对愤怒的客户，你保持了专业和冷静，最终化危机为机遇。', evalScore: 75, abilitiesChange: { core_business: 7, strategic_depth: 5 }, abilitiesAfter: { core_business: 70, project_management: 68, team_influence: 68, strategic_depth: 67 } },
+                { level: 6, title: '团队管理', icon: '👨‍💼', comment: '你带领团队在高压下完成了不可能的任务，展现了卓越的领导力和团队凝聚力！', evalScore: 92, abilitiesChange: { team_influence: 12, project_management: 8, core_business: 5 }, abilitiesAfter: { core_business: 75, project_management: 76, team_influence: 80, strategic_depth: 67 } },
+                { level: 7, title: '跨职能领导', icon: '🏆', comment: '你成功推动了公司级的战略转型项目，获得了全公司的认可，达到了职业新高度！', evalScore: 95, abilitiesChange: { strategic_depth: 15, core_business: 8, team_influence: 5, project_management: 5 }, abilitiesAfter: { core_business: 83, project_management: 81, team_influence: 85, strategic_depth: 82 } }
+            ];
+
+            window.evaluationScores = window.levelHistory.map(h => h.evalScore);
+            window.abilitySnapshots = [
+                { core_business: 50, project_management: 50, team_influence: 50, strategic_depth: 50 },
+                { core_business: 58, project_management: 50, team_influence: 53, strategic_depth: 50 },
+                { core_business: 63, project_management: 60, team_influence: 53, strategic_depth: 50 },
+                { core_business: 63, project_management: 60, team_influence: 58, strategic_depth: 62 },
+                { core_business: 63, project_management: 68, team_influence: 68, strategic_depth: 62 },
+                { core_business: 70, project_management: 68, team_influence: 68, strategic_depth: 67 },
+                { core_business: 75, project_management: 76, team_influence: 80, strategic_depth: 67 },
+                { core_business: 83, project_management: 81, team_influence: 85, strategic_depth: 82 }
+            ];
+
+            window.abilities = { core_business: 83, project_management: 81, team_influence: 85, strategic_depth: 82 };
+            window.currentLevel = 7;
+
+            if (typeof showGameOver === 'function') {
+                showGameOver(mockData);
+            } else {
+                document.getElementById('modal-overlay').style.display = 'flex';
+                console.warn('⚠️ showGameOver 函数未找到，仅显示弹窗容器');
+            }
+        };
+    </script>
 </body>
 </html>
