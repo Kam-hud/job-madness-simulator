@@ -56,59 +56,6 @@ let elements = null;
 let levelHistory = [];
 let abilitySnapshots = [];
 let evaluationScores = [];
-function saveGameState() {
-    const state = {
-        currentLevel,
-        abilities: { ...abilities },
-        skills: { ...skills },
-        gameCoins,
-        rechargedCoins,
-        levelHistory: [...levelHistory],
-        abilitySnapshots: [...abilitySnapshots],
-        evaluationScores: [...evaluationScores],
-        timestamp: Date.now()
-    };
-    localStorage.setItem('jobMadnessGameState', JSON.stringify(state));
-    console.log('💾 游戏状态已保存:', state);
-}
-function restoreGameState() {
-    try {
-        const saved = localStorage.getItem('jobMadnessGameState');
-        if (!saved) {
-            console.log('💾 无保存的游戏状态，使用默认值');
-            return false;
-        }
-        const state = JSON.parse(saved);
-        const now = Date.now();
-        if (now - state.timestamp > 24 * 60 * 60 * 1000) {
-            console.log('💾 保存的状态已过期（超过24小时），使用默认值');
-            localStorage.removeItem('jobMadnessGameState');
-            return false;
-        }
-        currentLevel = state.currentLevel || 1;
-        abilities = state.abilities || { 
-            core_business: 50, project_management: 50, team_influence: 50, strategic_depth: 50 
-        };
-        skills = state.skills || {
-            conflict: 'locked', eq: 'locked', negotiation: 'locked', 
-            mobilization: 'locked', boundary: 'locked', public_speaking: 'locked'
-        };
-        gameCoins = state.gameCoins || 1000;
-        rechargedCoins = state.rechargedCoins || 0;
-        levelHistory = state.levelHistory || [];
-        abilitySnapshots = state.abilitySnapshots || [];
-        evaluationScores = state.evaluationScores || [];
-        console.log('💾 游戏状态已恢复:', state);
-        return true;
-    } catch (error) {
-        console.error('💾 恢复游戏状态失败:', error);
-        return false;
-    }
-}
-function clearGameState() {
-    localStorage.removeItem('jobMadnessGameState');
-    console.log('💾 游戏状态已清除');
-}
 function updateAbilities(delta) {
     console.log('📊 更新能力值:', delta);
     if (delta.core_business !== undefined) {
@@ -223,7 +170,6 @@ async function fetchCurrentLevelEvent(level) {
 }
 async function startGame() {
     console.log('🚀 启动游戏...');
-    const hasSavedState = restoreGameState();
     elements.challengeDescription.textContent = '正在加载挑战数据...';
     try {
         console.log('📡 正在调用 API:', `${API_BASE}/api/start`);
@@ -243,23 +189,6 @@ async function startGame() {
         console.log('📥 原始响应文本:', text);
         const data = JSON.parse(text);
         console.log('📥 解析后的数据:', data);
-        if (hasSavedState && currentLevel > (data.current_level || 1)) {
-            console.log('💾 使用本地保存的状态（关卡', currentLevel, '> 服务端', data.current_level, '）');
-            updateAbilityDisplay('core', abilities.core_business, 0);
-            updateAbilityDisplay('project', abilities.project_management, 0);
-            updateAbilityDisplay('team', abilities.team_influence, 0);
-            updateAbilityDisplay('strategy', abilities.strategic_depth, 0);
-            if (skills) updateSkills(skills);
-            updateLevel(currentLevel);
-            const eventData = await fetchCurrentLevelEvent(currentLevel);
-            if (eventData) {
-                displayChallenge(eventData);
-            } else {
-                displayChallenge(data.current_event);
-            }
-            initCoins(gameCoins);
-            return;
-        }
         if (data.abilities) {
             abilities = { ...data.abilities };
             updateAbilityDisplay('core', abilities.core_business, 0);
@@ -431,7 +360,6 @@ async function submitAction() {
                     displayChallenge(data.current_event);
                 }
                 elements.playerInput.value = '';
-                saveGameState();
             }, 10000);
         }
     } catch (error) {
@@ -983,7 +911,6 @@ function closeReport() {
     document.getElementById('modal-overlay').style.display = 'none';
 }
 function restartGame() {
-    clearGameState();
     document.getElementById('modal-overlay').style.display = 'none';
     document.getElementById('player-input').value = '';
     hideComment();
