@@ -1069,7 +1069,7 @@ function showAchievementReport() {
     }
 }
 
-// 【积分耗尽模式】激活倦怠状态
+// 【大模型调用失败】激活倦怠状态
 function activateBurnoutMode() {
     console.log('🔥 激活职业倦怠模式');
     
@@ -1081,7 +1081,7 @@ function activateBurnoutMode() {
         burnoutWarning.innerHTML = `
             <div class="warning-content">
                 <span class="warning-icon">⚠️</span>
-                <span class="warning-text">当前职业动能不足，建议前往"职业资产包"进行充值</span>
+                <span class="warning-text">大模型调用失败，建议前往"联系管理员"进行修复</span>
             </div>
         `;
         document.querySelector('.container').insertBefore(burnoutWarning, document.querySelector('.container').firstChild);
