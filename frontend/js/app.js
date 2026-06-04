@@ -56,6 +56,116 @@ let elements = null;
 let levelHistory = [];
 let abilitySnapshots = [];
 let evaluationScores = [];
+
+// ==================== localStorage 存档 ====================
+function saveGameState() {
+    const state = {
+        currentLevel,
+        abilities: { ...abilities },
+        skills: { ...skills },
+        gameCoins,
+        rechargedCoins,
+        levelHistory: [...levelHistory],
+        abilitySnapshots: [...abilitySnapshots],
+        evaluationScores: [...evaluationScores]
+    };
+    localStorage.setItem('jobMadnessGameState', JSON.stringify(state));
+}
+
+function restoreGameState() {
+    try {
+        const saved = localStorage.getItem('jobMadnessGameState');
+        if (!saved) return false;
+        const state = JSON.parse(saved);
+        currentLevel = state.currentLevel || 1;
+        abilities = state.abilities || { core_business: 50, project_management: 50, team_influence: 50, strategic_depth: 50 };
+        skills = state.skills || { conflict: 'locked', eq: 'locked', negotiation: 'locked', mobilization: 'locked', boundary: 'locked', public_speaking: 'locked' };
+        gameCoins = state.gameCoins || 1000;
+        rechargedCoins = state.rechargedCoins || 0;
+        levelHistory = state.levelHistory || [];
+        abilitySnapshots = state.abilitySnapshots || [];
+        evaluationScores = state.evaluationScores || [];
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function clearGameState() {
+    localStorage.removeItem('jobMadnessGameState');
+}
+
+// ==================== 音效系统 ====================
+const SoundFX = {
+    ctx: null,
+    init() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    play(type) {
+        if (!this.ctx) this.init();
+        const ctx = this.ctx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        switch(type) {
+            case 'click':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.08);
+                break;
+            case 'submit':
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+                break;
+            case 'pass':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523, ctx.currentTime);
+                osc.frequency.setValueAtTime(659, ctx.currentTime + 0.15);
+                osc.frequency.setValueAtTime(784, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+                break;
+            case 'fail':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.4);
+                break;
+            case 'gameover':
+                const notes = [523, 587, 659, 698, 784, 880, 988, 1047];
+                notes.forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1);
+                    g.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.2);
+                    o.start(ctx.currentTime + i * 0.1);
+                    o.stop(ctx.currentTime + i * 0.1 + 0.2);
+                });
+                break;
+        }
+    }
+};
+
 function updateAbilities(delta) {
     console.log('📊 更新能力值:', delta);
     if (delta.core_business !== undefined) {
@@ -170,7 +280,14 @@ async function fetchCurrentLevelEvent(level) {
 }
 async function startGame() {
     console.log('🚀 启动游戏...');
+    elements.challengeTitle.textContent = '加载中...';
     elements.challengeDescription.textContent = '正在加载挑战数据...';
+    hideComment();
+    elements.playerInput.value = '';
+
+    // 检查是否有本地存档
+    const hasSave = restoreGameState();
+
     try {
         console.log('📡 正在调用 API:', `${API_BASE}/api/start`);
         const response = await fetch(`${API_BASE}/api/start`, {
@@ -189,17 +306,26 @@ async function startGame() {
         console.log('📥 原始响应文本:', text);
         const data = JSON.parse(text);
         console.log('📥 解析后的数据:', data);
-        if (data.abilities) {
+
+        if (hasSave) {
+            // 有存档：保留存档的能力值、金币和关卡，不从后端覆盖
+            updateAbilityDisplay('core', abilities.core_business, 0);
+            updateAbilityDisplay('project', abilities.project_management, 0);
+            updateAbilityDisplay('team', abilities.team_influence, 0);
+            updateAbilityDisplay('strategy', abilities.strategic_depth, 0);
+            updateCoinsDisplay();
+            showToast(`已恢复存档：Level ${currentLevel}`, 'info');
+        } else if (data.abilities) {
             abilities = { ...data.abilities };
             updateAbilityDisplay('core', abilities.core_business, 0);
             updateAbilityDisplay('project', abilities.project_management, 0);
             updateAbilityDisplay('team', abilities.team_influence, 0);
             updateAbilityDisplay('strategy', abilities.strategic_depth, 0);
         }
-        if (data.skills) {
+        if (!hasSave && data.skills) {
             updateSkills(data.skills);
         }
-        if (data.current_level) {
+        if (!hasSave && data.current_level) {
             updateLevel(data.current_level);
         }
         if (data.current_event) {
@@ -209,7 +335,7 @@ async function startGame() {
             console.error('❌ current_event 为空');
             elements.challengeDescription.textContent = '暂无挑战数据';
         }
-        if (data.coins !== undefined) {
+        if (!hasSave && data.coins !== undefined) {
             initCoins(data.coins);
         }
     } catch (error) {
@@ -250,6 +376,7 @@ async function submitAction() {
         alert('请输入你的策略性回应！');
         return;
     }
+    SoundFX.play('submit');
     elements.submitBtn.disabled = true;
     elements.submitBtn.textContent = '策略实施中...';
     try {
@@ -333,6 +460,7 @@ async function submitAction() {
             updateSkills(data.skills);
         }
         if (data.game_over) {
+            SoundFX.play('gameover');
             recordLevelHistory(data);
             window._pendingGameOverData = data;
             setTimeout(() => {
@@ -341,7 +469,31 @@ async function submitAction() {
                     reportBtn.style.display = 'block';
                 }
             }, 2000);
+        } else if (data.pass_condition_met === false) {
+            const abilityNameMap = { core_business: '核心业务', project_management: '项目管理', team_influence: '团队协同', strategic_depth: '战略思维' };
+            const abName = abilityNameMap[data.pass_ability_required] || data.pass_ability_required || '能力';
+            const currentVal = abilities[data.pass_ability_required] || 0;
+            const threshold = data.pass_threshold || 0;
+            showToast(`${abName}不足（当前${currentVal}，需要≥${threshold}），请重新挑战本关`, 'error');
+            // 清空输入框，但保留AI点评
+            elements.playerInput.value = '';
+            // 红框闪烁效果加在挑战区域
+            const challengeCard = document.querySelector('.event-card') || document.getElementById('event-display')?.parentElement;
+            if (challengeCard) {
+                challengeCard.style.transition = 'border-color 0.3s, box-shadow 0.3s';
+                challengeCard.style.borderColor = '#ef4444';
+                challengeCard.style.boxShadow = '0 0 20px rgba(239,68,68,0.3)';
+                setTimeout(() => {
+                    challengeCard.style.borderColor = '';
+                    challengeCard.style.boxShadow = '';
+                }, 2000);
+            }
+            SoundFX.play('fail');
+            elements.submitBtn.disabled = false;
+            elements.submitBtn.textContent = '⚡ 实施职业对策';
         } else {
+            SoundFX.play('pass');
+            saveGameState();
             setTimeout(() => {
                 hideComment();
                 recordLevelHistory(data);
@@ -428,6 +580,7 @@ function showGameOver(data) {
     renderGrowthChart();
     renderSummary(data, totalScore);
     renderSuggestions(totalScore);
+    renderEnding(data);
     document.getElementById('modal-overlay').style.display = 'flex';
 }
 function renderRadarChart() {
@@ -746,6 +899,57 @@ function renderSuggestions(totalScore) {
         suggestions.map((s, i) => `<div style="margin-bottom:8px;">${i+1}. ${s}</div>`).join('');
 }
 
+function renderEnding(data) {
+    const vals = { ...abilities };
+    const avg = (vals.core_business + vals.project_management + vals.team_influence + vals.strategic_depth) / 4;
+    const entries = Object.entries(vals);
+    let maxAbility = entries.reduce((a, b) => a[1] > b[1] ? a : b)[0];
+    let minAbility = entries.reduce((a, b) => a[1] < b[1] ? a : b)[0];
+
+    const abilityNames = { core_business: '核心业务', project_management: '项目管理', team_influence: '团队协同', strategic_depth: '战略思维' };
+    const endingColors = { '全才型': '#fbbf24', '偏科型': '#f59e0b', '精英型': '#3b82f6', '均衡型': '#8b5cf6', '平庸型': '#64748b' };
+
+    let endingType, endingTitle, endingDesc;
+
+    if (Object.values(vals).every(v => v >= 70)) {
+        endingType = '全才型';
+        endingTitle = '六边形战士';
+        endingDesc = '你在每一个维度上都展现出了顶级职场人的素养，无论是业务深耕还是战略眼光，都已达到令人仰望的高度。';
+    } else if (Math.max(...Object.values(vals)) >= 80 && Math.min(...Object.values(vals)) < 40) {
+        endingType = '偏科型';
+        endingTitle = `${abilityNames[maxAbility]}专精者`;
+        endingDesc = `你的${abilityNames[maxAbility]}能力出类拔萃，但其他维度明显薄弱。职场如木桶，短板决定了你的上限。`;
+    } else if (Math.min(...Object.values(vals)) < 35) {
+        endingType = '平庸型';
+        endingTitle = '职场路人';
+        endingDesc = '你在这次模拟中表现平平，没有突出的优势也没有致命短板——但职场不进则退，平庸是最危险的信号。';
+    } else if (avg >= 55) {
+        endingType = '精英型';
+        endingTitle = '部门中坚';
+        endingDesc = '你的综合能力稳扎稳打，虽然尚未达到顶尖水平，但已经具备了独当一面的实力，是团队中不可或缺的中坚力量。';
+    } else {
+        endingType = '均衡型';
+        endingTitle = '稳步前行者';
+        endingDesc = '你的各项能力发展均衡，虽无特别突出之处，但也没有明显短板。持续积累，未来可期。';
+    }
+
+    const color = endingColors[endingType] || '#8b5cf6';
+
+    const typeEl = document.getElementById('ending-type');
+    const titleEl = document.getElementById('ending-title');
+    const descEl = document.getElementById('ending-desc');
+
+    if (typeEl) typeEl.textContent = endingType;
+    if (titleEl) titleEl.textContent = endingTitle;
+    if (descEl) descEl.textContent = endingDesc;
+
+    const endingCard = document.getElementById('ending-card');
+    if (endingCard) {
+        endingCard.style.borderColor = color;
+        endingCard.style.boxShadow = `0 0 30px ${color}33`;
+    }
+}
+
 async function exportReport() {
     const modalOverlay = document.getElementById('modal-overlay');
     const reportContainer = document.getElementById('report-container');
@@ -919,6 +1123,7 @@ function restartGame() {
         viewReportBtn.style.display = 'none';
     }
     window._pendingGameOverData = null;
+    clearGameState();
     gameCoins = 1000;
     rechargedCoins = 0;
     lastBackendCoins = 1000;
@@ -1250,3 +1455,18 @@ window.selectAmount = selectAmount;
 window.selectPayment = selectPayment;
 window.submitRecharge = submitRecharge;
 window.submitAction = submitAction;
+
+// 全局按钮点击音效
+document.addEventListener('click', function(e) {
+    const tag = e.target.closest('button, .btn, [onclick]');
+    if (tag) {
+        SoundFX.play('click');
+    }
+});
+
+// 导出报告音效单独绑定
+document.addEventListener('click', function(e) {
+    if (e.target.closest('#export-report-btn') || e.target.closest('#share-report-btn')) {
+        SoundFX.play('click');
+    }
+});

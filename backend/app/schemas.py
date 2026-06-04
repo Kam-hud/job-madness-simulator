@@ -55,3 +55,9 @@ class SubmitReplyResponse(BaseModel):
     next_event: Optional[GameEvent] = None
     game_over: bool = False
     final_score: Optional[int] = None
+    pass_condition_met: bool = True
+    pass_ability_required: str = ""
+    pass_threshold: int = 0
+    ending_type: str = ""
+    ending_title: str = ""
+    ending_description: str = ""

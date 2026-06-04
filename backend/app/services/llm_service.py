@@ -410,7 +410,7 @@ class LLMService:
             return random.choice(self.neutral_comments)
     
     def _determine_ability_change(self, player_input: str) -> dict:
-        """根据玩家输入决定能力变化"""
+        """根据玩家输入决定能力变化——被骂得越狠，成长越快；敷衍则退步"""
         input_lower = player_input.lower()
         
         positive_keywords = ["冷静", "分析", "沟通", "解决", "方案", "协调", "主动", "承担", "负责"]
@@ -419,29 +419,29 @@ class LLMService:
         has_positive = any(keyword in input_lower for keyword in positive_keywords)
         has_negative = any(keyword in input_lower for keyword in negative_keywords)
         
-        if has_positive and not has_negative:
-            # 积极应对 - 小幅正增长（模拟倦怠模式下的有限恢复）
+        if has_negative:
+            # AI毒舌点评 = 你的回答有讨论价值 → 被骂得越狠，能力涨得越多
             return {
-                "core_business": 1,
-                "project_management": 1,
-                "team_influence": 0,
-                "strategic_depth": 0
+                "core_business": 8,
+                "project_management": 6,
+                "team_influence": 5,
+                "strategic_depth": 5
             }
-        elif has_negative:
-            # 消极应对 - 负增长
+        elif has_positive and not has_negative:
+            # AI敷衍了事 = 回答无聊不值得认真批评 → 能力退步
             return {
-                "core_business": -2,
-                "project_management": -1,
-                "team_influence": -1,
-                "strategic_depth": -1
+                "core_business": -5,
+                "project_management": -4,
+                "team_influence": -3,
+                "strategic_depth": -3
             }
         else:
-            # 中性应对 - 轻微负增长（倦怠模式默认）
+            # 中性 → 小幅退步（不进则退）
             return {
-                "core_business": -1,
-                "project_management": -1,
-                "team_influence": 0,
-                "strategic_depth": 0
+                "core_business": -3,
+                "project_management": -2,
+                "team_influence": -2,
+                "strategic_depth": -2
             }
 
     def _get_default_evaluation(self, level: int = 1) -> dict:
@@ -449,43 +449,43 @@ class LLMService:
         default_evaluations = [
             {
                 "comment": "应对得体，展现基础应变能力。",
-                "abilities_change": {"core_business": 1, "project_management": 0, "team_influence": 0, "strategic_depth": 0},
+                "abilities_change": {"core_business": 4, "project_management": 3, "team_influence": 2, "strategic_depth": 2},
                 "skills_matrix": {"conflict": "expanded", "eq": "locked", "negotiation": "locked", "mobilization": "locked", "boundary": "locked", "public_speaking": "locked"},
                 "next_event": "Level 2 - 紧急任务突击"
             },
             {
                 "comment": "处理得当，项目管理能力有所提升。",
-                "abilities_change": {"core_business": 1, "project_management": 2, "team_influence": 0, "strategic_depth": 0},
+                "abilities_change": {"core_business": 4, "project_management": 5, "team_influence": 3, "strategic_depth": 3},
                 "skills_matrix": {"conflict": "expanded", "eq": "expanded", "negotiation": "locked", "mobilization": "locked", "boundary": "expanded", "public_speaking": "locked"},
                 "next_event": "Level 3 - 战略视野发展"
             },
             {
                 "comment": "表现出色，战略思维深度明显提升。",
-                "abilities_change": {"core_business": 2, "project_management": 2, "team_influence": 1, "strategic_depth": 3},
+                "abilities_change": {"core_business": 5, "project_management": 5, "team_influence": 4, "strategic_depth": 6},
                 "skills_matrix": {"conflict": "expanded", "eq": "expanded", "negotiation": "expanded", "mobilization": "locked", "boundary": "expanded", "public_speaking": "locked"},
                 "next_event": "Level 4 - 跨部门协作困境"
             },
             {
                 "comment": "跨部门协调能力优秀，团队影响力显著增强。",
-                "abilities_change": {"core_business": 2, "project_management": 3, "team_influence": 3, "strategic_depth": 2},
+                "abilities_change": {"core_business": 6, "project_management": 6, "team_influence": 7, "strategic_depth": 5},
                 "skills_matrix": {"conflict": "expanded", "eq": "expanded", "negotiation": "expanded", "mobilization": "expanded", "boundary": "expanded", "public_speaking": "locked"},
                 "next_event": "Level 5 - 客户危机处理"
             },
             {
                 "comment": "危机处理能力卓越，展现高级管理者潜质。",
-                "abilities_change": {"core_business": 3, "project_management": 3, "team_influence": 3, "strategic_depth": 3},
+                "abilities_change": {"core_business": 7, "project_management": 7, "team_influence": 7, "strategic_depth": 8},
                 "skills_matrix": {"conflict": "expanded", "eq": "expanded", "negotiation": "expanded", "mobilization": "expanded", "boundary": "expanded", "public_speaking": "expanded"},
                 "next_event": "Level 6 - 团队管理挑战"
             },
             {
                 "comment": "团队领导能力出众，已具备中层管理实力。",
-                "abilities_change": {"core_business": 4, "project_management": 4, "team_influence": 4, "strategic_depth": 3},
+                "abilities_change": {"core_business": 8, "project_management": 8, "team_influence": 9, "strategic_depth": 7},
                 "skills_matrix": {"conflict": "expanded", "eq": "expanded", "negotiation": "expanded", "mobilization": "expanded", "boundary": "expanded", "public_speaking": "expanded"},
                 "next_event": "Level 7 - 跨职能团队领导"
             },
             {
                 "comment": "恭喜！你已成为真正的职场领导者！",
-                "abilities_change": {"core_business": 5, "project_management": 5, "team_influence": 5, "strategic_depth": 5},
+                "abilities_change": {"core_business": 10, "project_management": 9, "team_influence": 10, "strategic_depth": 10},
                 "skills_matrix": {"conflict": "expanded", "eq": "expanded", "negotiation": "expanded", "mobilization": "expanded", "boundary": "expanded", "public_speaking": "expanded"},
                 "next_event": "🎉 恭喜通关！你已完成所有职场挑战"
             }
@@ -557,41 +557,133 @@ class LLMService:
         return event_titles[idx]
 
     # 关卡场景映射表 — 与前端 LEVEL_NAMES 严格一致，确保侧边栏与主对话区场景匹配
+    # 每关包含3个完全不同的具体场景角度，每次随机选一个展开
     LEVEL_SCENARIOS = {
         1: {
             "theme": "同事甩锅",
-            "scenario": "同事之间的矛盾冲突：项目出了问题，同事在会议上把责任推给你。你需要面对老板的质问，既要澄清事实，又不能显得推卸责任或损害团队关系。",
-            "keywords": "甩锅,推卸责任,背锅,会议冲突,责任归属,替罪羊,同事矛盾"
+            "keywords": "甩锅,推卸责任,背锅,会议冲突,责任归属,替罪羊,同事矛盾",
+            "angles": [
+                {
+                    "angle": "周会甩锅",
+                    "detail": "上午项目复盘会上，同级同事张伟突然说「这个数据错误是李工那边出的问题」，而实际上数据是你从他那里拿到的原始版本。部门总监刘总皱眉看着你。会议室里坐了8个人，空气凝固了3秒。"
+                },
+                {
+                    "angle": "邮件抄送全公司",
+                    "detail": "你打开邮箱发现一封群发邮件，同事陈敏把客户投诉的原因归结为「前端对接环节信息传递有误」，抄送了VP、HRBP和你所在项目组全部12人。而你知道问题出在她负责的后端排期延误。"
+                },
+                {
+                    "angle": "甲方现场追责",
+                    "detail": "你和同事王磊一起去甲方现场汇报进度。甲方项目经理突然拍桌子：「上个月的交付质量简直离谱！」王磊立刻看向你说「这部分主要是李工在跟」。甲方的CTO、PMO和你的直属领导都在场。"
+                }
+            ]
         },
         2: {
             "theme": "紧急任务",
-            "scenario": "紧急项目任务突击：临近下班或放假，领导突然丢给你一个紧急任务，时间紧迫、资源有限。你需要在极短时间内完成高质量交付，同时处理好工作与生活的边界。",
-            "keywords": "紧急任务,deadline,加班,临时安排,任务突击,时间压力,紧急交付"
+            "keywords": "紧急任务,deadline,加班,临时安排,任务突击,时间压力,紧急交付",
+            "angles": [
+                {
+                    "angle": "下班前的竞品分析",
+                    "detail": "周五下午5:40，你正要关电脑。VP直接走到你工位前：「竞品刚发了新版，帮我做一份对比分析，30页，明天早上9点跟CEO汇报用。」隔壁工位的同事偷偷给你发了条微信：「又来了…」"
+                },
+                {
+                    "angle": "提前交付的客户要求",
+                    "detail": "客户方项目经理在微信群里@你：「总部临时安排，交付时间提前到下周三。我知道原定两周后，但没办法。」此时是周五晚上8点，你的开发资源池里只有你和一名实习生。"
+                },
+                {
+                    "angle": "原负责人突然请假",
+                    "detail": "周一早上你收到HR邮件：项目负责人赵姐因家中有急事请假一周。而她的项目明天要向客户交付阶段性成果。你是组里唯一了解该项目背景的人。PM在群里说：「李工，你来接手吧，辛苦了。」"
+                }
+            ]
         },
         3: {
             "theme": "战略视野",
-            "scenario": "战略视野发展：部门会议上，老板要求你对公司战略或行业趋势发表看法，而你准备不足。你需要展现超越执行层的思考深度，同时又不能显得纸上谈兵。",
-            "keywords": "战略视野,行业趋势,部门会议,战略发言,高层汇报,前瞻性,格局"
+            "keywords": "战略视野,行业趋势,部门会议,战略发言,高层汇报,前瞻性,格局",
+            "angles": [
+                {
+                    "angle": "季度规划会即兴发言",
+                    "detail": "季度战略规划会上，CEO突然说：「在座各位对明年行业趋势有什么判断？每人3分钟，从李工开始。」你环顾四周——CTO、CFO、VP们都在笔记本上准备记录。你准备的PPT是这个季度的复盘数据。"
+                },
+                {
+                    "angle": "投资人尽调现场",
+                    "detail": "投资机构来做尽调，CTO临时拉你进会议室：「李工是我们核心产品线的负责人，让他来介绍一下技术壁垒和竞品格局。」你一看投影仪上的议程——根本没有安排你的环节。对面的投资人翻开了笔记本。"
+                },
+                {
+                    "angle": "行业论坛即兴圆桌",
+                    "detail": "公司请你作为代表参加行业论坛的圆桌讨论。你被告知「随便聊聊就行」。但到了现场发现直播摄像机已经开机，主持人第一个问题抛给你：「贵公司如何应对最近政策变化对行业的冲击？」台下300人。"
+                }
+            ]
         },
         4: {
             "theme": "跨部门协作",
-            "scenario": "跨部门协作困境：跨部门项目陷入僵局，其他部门负责人对你的需求置若罔闻或互相推诿，deadline日益逼近。你需要协调多方利益，打破部门墙推动项目前进。",
-            "keywords": "跨部门,协作,推诿,部门墙,利益冲突,资源协调,多方沟通"
+            "keywords": "跨部门,协作,推诿,部门墙,利益冲突,资源协调,多方沟通",
+            "angles": [
+                {
+                    "angle": "双周评审会的僵局",
+                    "detail": "双周项目评审会上，法务部说「合同条款风险太大不能签」，财务部说「预算超了15%不给批」，技术部说「排期要到下个迭代」。你负责的项目卡在中间，距离上线只剩10天。各部门负责人都在看你的态度。"
+                },
+                {
+                    "angle": "数据口径之争",
+                    "detail": "你发现市场部和运营部上报给VP的数据口径不一致——同一指标差了37%。VP在管理群@你：「李工，你来牵头统一数据口径，周五前给我方案。」你的消息被运营总监和市场总监同时已读不回。"
+                },
+                {
+                    "angle": "办公室政治漩涡",
+                    "detail": "你负责的跨部门项目需要设计部出3个方案，但设计总监和你的直属上级上周在全员大会上有过争执。设计部的人回复你「排期满了，至少两周后」。你的项目下周一要给COO演示。"
+                }
+            ]
         },
         5: {
             "theme": "客户危机",
-            "scenario": "客户危机处理：重要客户突然提出终止合作或投诉重大问题，老板要求你在短时间内挽回局面。你需要快速响应、精准定位问题根源，并给出让客户满意的解决方案。",
-            "keywords": "客户危机,终止合作,投诉,挽回客户,危机公关,客户关系"
+            "keywords": "客户危机,终止合作,投诉,挽回客户,危机公关,客户关系",
+            "angles": [
+                {
+                    "angle": "KA客户的最后通牒",
+                    "detail": "公司TOP3的KA客户发来正式邮件：「连续两个季度满意度低于60%，如48小时内没有实质性改善方案，我们将在下周一终止合同。」这个客户占你所在事业部35%的营收。VP把你叫进办公室：「无论如何，必须留住。」"
+                },
+                {
+                    "angle": "社交媒体舆情爆发",
+                    "detail": "一个用户在微博发了长文控诉你们产品的Bug导致其损失了5万块钱，转发已经破万。PR部门要求24小时内给出技术排查报告和赔偿方案，产品部门说「这个Bug修不了」，法务说「公开道歉有法律风险」。你被指定为应急组组长。"
+                },
+                {
+                    "angle": "客户现场发飙",
+                    "detail": "季度汇报现场，客户方CTO当着双方团队20多人的面，把你们的交付报告摔在桌上：「这不是我第一次说这个问题了，你们到底有没有在听？」你的销售总监在桌子底下踢了你一脚。"
+                }
+            ]
         },
         6: {
             "theme": "团队管理",
-            "scenario": "团队管理挑战：你接手了一个士气低落、核心成员准备跳槽的团队。你需要在短时间内重建团队凝聚力，留住关键人才，同时推动业务正常运转。",
-            "keywords": "团队管理,士气低落,核心成员流失,团队重建,领导力,留人"
+            "keywords": "团队管理,士气低落,核心成员流失,团队重建,领导力,留人",
+            "angles": [
+                {
+                    "angle": "核心骨干的辞职信",
+                    "detail": "你接手团队第二周，技术最强的工程师老王在周五一早把辞职信放在你桌上：「李哥，不好意思，实在撑不下去了。新公司薪资涨了30%，而且不加班。」你知道他一走，另外两个Junior也会跟着动摇。"
+                },
+                {
+                    "angle": "团队1on1的崩塌",
+                    "detail": "你和团队6个人分别做1on1。设计师小周说「感觉在这里没有成长」，运营小杨说「上次的功劳全被隔壁组抢了」，测试小陈说「连续加班两个月，身体吃不消了」。每个人的眼神里都是疲惫和不信任。"
+                },
+                {
+                    "angle": "新项目启动的阻力",
+                    "detail": "公司给你一个新项目指标，但你发现团队里没人愿意主动认领任务。晨会上你问「谁来负责前端部分？」会议室沉默了10秒。你的前任因为这个项目被优化了，团队心有余悸。"
+                }
+            ]
         },
         7: {
             "theme": "跨职能领导",
-            "scenario": "跨职能团队领导：作为跨职能项目的总负责人，你需要协调多个不同部门，平衡各方利益，推动高风险高回报的项目落地。这是对综合领导力的终极考验。",
-            "keywords": "跨职能,总负责人,多部门,高风险项目,综合领导力,终极挑战"
+            "keywords": "跨职能,总负责人,多部门,高风险项目,综合领导力,终极挑战",
+            "angles": [
+                {
+                    "angle": "高管会的最后通牒",
+                    "detail": "董事会要求的数字化转型项目，涉及产品/技术/运营/市场/财务5个部门，预算1200万，8个月交付。你在高管会上做中期汇报，CFO听完直接说：「ROI预期降了40%，这个项目还有做下去的必要吗？」COO和CMO交换了一个眼神。"
+                },
+                {
+                    "angle": "关键供应商断供",
+                    "detail": "项目最关键的外部供应商突然通知「因内部重组暂停服务3个月」，而你的项目核心模块依赖他们的API。技术VP说「换供应商至少要2个月磨合期」，产品VP说「上线节点不能动」。你在中间，两边都在等你拿主意。"
+                },
+                {
+                    "angle": "组织架构调整的冲击",
+                    "detail": "CEO宣布组织架构调整，你的项目Sponsor（CTO）被调岗，新来的CTO对这个项目态度不明。项目组成员人心惶惶，有人在群里发：「听说这个项目要被砍了？」你是项目总负责人，必须稳住局面。"
+                }
+            ]
         },
     }
     
@@ -599,49 +691,50 @@ class LLMService:
         """获取下一个游戏事件（职业挑战关卡）"""
         # 根据关卡级别获取精确匹配的场景定义
         scenario_def = self.LEVEL_SCENARIOS.get(level, self.LEVEL_SCENARIOS[1])
-        
-        prompt = f"""请生成一个职场挑战场景，具体要求如下：
 
-【关卡主题】Level {level} - {scenario_def['theme']}
+        # 从3个角度中随机选1个
+        import random
+        angle = random.choice(scenario_def['angles'])
 
-【场景约束（必须严格围绕此场景生成，禁止偏离主题）】
-{scenario_def['scenario']}
+        prompt = f"""你是职场情景剧编剧，需要为"职场韧性实战系统"游戏生成一个关卡场景。
 
-【核心关键词】{scenario_def['keywords']}
+【关卡】Level {level} - {scenario_def['theme']}
+【本次选中的场景角度】{angle['angle']}
 
-【生成要求】
-1. 标题必须明确包含场景主题词（如"甩锅""紧急任务""战略""跨部门""客户危机""团队管理""跨职能领导"等），格式为 "Level {level} - 具体场景名"
-2. 描述要有画面感，包含具体的人物、场景、冲突，字数50-100
-3. 场景难度与Level {level}匹配
-4. 【关键】禁止生成与此关卡主题无关的场景（如Level 1生成聚餐、Level 3生成客户投诉等偏离主题的内容）
-5. 每次生成的场景描述应有变化，但主题范畴不变
+【场景原型（请以此为基础，注入新的具体细节创作一个全新的版本）】
+{angle['detail']}
 
-【返回格式】
-返回纯净JSON格式，不要用markdown代码块包裹，不要有任何多余文字。JSON包含以下字段：
-   - level: 当前级别数字（整数）
-   - title: 关卡标题（如 "Level {level} - 具体场景名"），必须包含场景主题词
-   - description: 场景描述（50-100字，包含具体场景、人物、冲突）
-   - difficulty: 难度系数（1-7）
+【创作规则——严格遵守】
+1. 必须基于上面的原型扩展细节，但换一个不同的公司名、不同的人物职位、不同的行业背景
+2. 加入真实的职场元素：具体的公司名称（虚构）、人物全名+职位、时间（几点/周几）、具体数字（金额/人数/天数）
+3. 描述要有强烈的画面感和紧迫感，50-100字
+4. 整个场景必须是连贯的叙事段落，不能是列表式或说教式
+5. 标题格式：「Level {level} - XXXX」（XXXX是具体的场景概括，不含关卡主题词）
 
-请直接返回JSON！"""
+【禁止——绝对不要】
+- 不要生成和之前任何关卡相似的人物名、公司名、场景元素
+- 不要使用「XXX场景下」「XXX人物」「XXX冲突」等模板句式
+- 不要复述上面的原型原文，必须全新创作
+- 不要输出说教性质的职场道理
+
+【返回格式】纯净JSON（无markdown标记）：
+{{"level":{level},"title":"Level {level} - XXXX","description":"场景描述正文","difficulty":{min(level,7)}}}"""
 
         for attempt in range(2):
             try:
-                print(f"📡 请求大模型生成事件（Level {level}）...")
-                # _call_coze_api 现在直接返回解析后的字典
+                print(f"📡 请求大模型生成事件（Level {level}，角度：{angle['angle']}）...")
                 parsed_result = await self._call_coze_api(prompt)
 
                 parsed_result['level'] = level
                 parsed_result['difficulty'] = min(level, 7)
 
-                # 强制修正标题中的关卡号
                 original_title = parsed_result.get('title', '')
-                parsed_result['title'] = f"Level {level} - {scenario_def['theme']}"
+                if not original_title.startswith(f'Level {level}'):
+                    parsed_result['title'] = f"Level {level} - {original_title.replace(f'Level {level} - ', '')}"
 
-                # 校验描述是否匹配当前关卡主题，如果不匹配则重试一次
-                theme = scenario_def['theme']
-                if theme not in original_title and attempt == 0:
-                    print(f"场景主题不匹配，重试...")
+                desc = parsed_result.get('description', '')
+                if len(desc) < 20 and attempt == 0:
+                    print(f"场景描述过短，重试...")
                     continue
 
                 print(f"✅ 事件生成成功: {parsed_result['title']}")
@@ -657,43 +750,50 @@ class LLMService:
 
     async def evaluate_player_action(self, situation: str, player_input: str, level: int = 1) -> dict:
         """评价玩家的行动，返回职业能力变化 - 严格遵循指定 JSON 格式"""
-        prompt = f"""【身份设定】你是一个毫无人情味、毒舌至极的职场批评家。你的职责是用最刻薄、最尖锐、最不留情面的语言批判用户的职场表现。每次评价必须像一把锋利的手术刀，精准地切开用户虚伪的职场面具。
+        prompt = f"""【身份】你是毒舌职场批评家。你的评价必须像手术刀一样精准刺穿玩家的回答。
 
-【核心原则】
-1. 绝对禁止使用任何温柔的词汇，如"尚可"、"不错"、"还好"、"还行"
-2. 每次评价必须从不同角度切入：专业能力、人际关系、情商表现、战略思维、执行效率等
-3. 必须根据用户输入的具体内容生成独特评价，严禁套用任何模板
-4. 评价语言要狠毒、犀利、一针见血，让用户感到刺痛但不侮辱人格
-5. 【重要】每次回复必须完全不同，禁止重复使用之前用过的表达方式和句式
+【最重要规则——必须逐句拆解玩家回答】
+你的评价步骤：
+1. 先用自己的话列出玩家回答涉及了哪几个要点（1-3条）
+2. 逐条分析每个要点的对错、幼稚之处、虚伪之处
+3. 最后给出总评和能力变化
 
-【多样化毒舌评价示例】（每次必须选择不同的角度和表达）
-- 专业能力角度："你的专业水平就像一杯白开水，没有味道也没有营养。","你的知识储备还不如一个实习生，至少实习生还知道谦虚。","处理专业问题的能力堪忧，难怪只能做基础工作。","你的技术水平停留在上个世纪，该更新了。","专业术语堆砌了一堆，实际应用却一塌糊涂。","理论一套一套的，实践起来就抓瞎。","自称专业能力强，但连基本流程都说不清楚。","专业判断频频失误，你是在考验我的耐心吗？"
-- 人际关系角度："你以为和同事打成一片就是情商高？不过是用小恩小惠收买人心罢了。","和稀泥的方式处理冲突，看似高明实则懦弱。","人际边界模糊，要么被人欺负要么欺负人。","你以为的'好人缘'不过是别人不想得罪你罢了。","和谁都客气，和谁都不交心，这种社交有什么意义？","察言观色是本事，但过度解读就是自作聪明。","你以为的幽默感，在别人眼里不过是尬聊。","人脉广泛？不过是加了微信的陌生人罢了。"
-- 执行效率角度："效率低下还找借口，你的借口比你的工作报告还要厚。","一天的工作你磨蹭了三天，进度拖延借口倒是一堆。","手速慢得像蜗牛，还自诩为'慢工出细活'。","总是加班感动自己，实际产出低得可怜。","十分钟能搞定的事你花了一小时，还觉得自己很努力。","效率低就算了，质量还不过关，简直是双重打击。","任务分配下来了，你却一直在'准备中'。","ddl才是第一生产力，平时都在摸鱼。"
-- 战略思维角度："你眼中的战略就是看老板脸色，这种见风使舵的能力倒是很'出色'。","只看到眼前三尺，远见什么的根本不存在。","战略眼光为零，只会盯着眼前的一亩三分地。","格局太小，细节做得再好也是无用功。","大方向都搞不清楚，在细枝末节上纠结有什么意义？","战略规划？不存在的，永远在被动应对。","缺乏前瞻性思维，永远在救火而不是防火。","你以为的深谋远虑，不过是患得患失罢了。"
-- 危机处理角度："遇到问题就慌，你的镇定能力还不如一只受惊的鹌鹑。","危机当前你选择逃避，推卸责任倒是很积极。","处理危机的能力约等于零，只会制造更多问题。","面对突发状况毫无章法，手忙脚乱一团糟。","压力一大就崩溃，这种心理素质怎么扛事？","问题出现了你不解决，反而在纠结谁的责任。","危机处理手忙脚乱，越处理越乱。","关键时刻掉链子，平时吹的牛皮全破了。"
+注意：步骤1和2必须写在 comment 字段中，作为点评内容的一部分。不要只是笼统地说"还行""太差了"。
 
-【当前场景】：{situation}
-【玩家回应】：{player_input}
-【当前级别】：Level {level}
+【禁止模板化——每次评价必须不同】
+- 每一条评价都必须针对你刚刚读到的具体回答内容
+- 如果你觉得玩家的回答很像你已经见过很多次的套路，就直接指出来
+- 禁止使用任何你已经在这个对话中用过的评价句式和措辞
+- 禁止使用"表现不错""继续加油""还需努力"等万金油话语
 
-【能力变化规则】（根据评价的狠毒程度和准确性决定）
-- 点评精准、批评到位、用户有明显进步：能力+1到+3
-- 点评一般、批评有道理：能力+0到+1
-- 点评敷衍、批评不痛不痒：能力-1到-2
-- 严重失职、态度恶劣、完全没有职场素养：能力-3到-5
+【场景】
+{situation}
 
-【输出要求】
-必须严格按照以下 JSON 格式返回，绝对禁止添加任何解释、备注或额外文字：
-{{"comment": "毒舌点评内容（50-150字）", "abilities_change": {{"core_business": 数字, "project_management": 数字, "team_influence": 数字, "strategic_depth": 数字}}, "skills_matrix": {{"conflict": "locked或expanded", "eq": "locked或expanded", "negotiation": "locked或expanded", "mobilization": "locked或expanded", "boundary": "locked或expanded", "public_speaking": "locked或expanded"}}, "next_event": "Level N+1 - 具体挑战标题"}}
+【玩家回答】
+{player_input}
+
+【当前级别】Level {level}
+
+【能力变化规则】（唯一标准：点评的狠毒程度）
+这是"职场韧性实战"的核心机制——被骂得越狠，说明你的回答越值得AI认真对待，成长越快。
+能力变化幅度只取决于AI点评本身有多毒舌、多精准，与玩家回答的"好坏"无关。
+- 点评精准狠毒、逐条拆解批评一针见血：能力+7到+10
+- 点评有一定批评力度、指出了核心问题：能力+4到+6
+- 点评一般、批评有道理但不够犀利：能力+1到+3
+- 点评敷衍、不痛不痒、像在应付：能力-5到-2（你的回答太无聊，连批评都懒得认真写）
+
+注意：玩家回答越"差"越容易触发狠毒点评，所以越是离谱的回答，能力反而可能涨得越多——这就是"被骂得越狠成长越快"。
+
+【输出格式】纯JSON（禁止markdown包裹）：
+{{"comment":"你的毒舌点评（100-200字，必须包含对玩家回答要点的逐条拆解和批评）","abilities_change":{{"core_business":数字,"project_management":数字,"team_influence":数字,"strategic_depth":数字}},"skills_matrix":{{"conflict":"locked或expanded","eq":"locked或expanded","negotiation":"locked或expanded","mobilization":"locked或expanded","boundary":"locked或expanded","public_speaking":"locked或expanded"}},"next_event":"Level N+1 - 具体挑战标题"}}
 
 【绝对禁止】
-- 禁止输出"表现不错"、"继续加油"等温柔话语
-- 禁止重复使用之前评价过的相似表达
-- 禁止使用任何 Emoji 或表情符号
-- 禁止在 JSON 前后添加任何 markdown 代码块标记"""
+- 禁止输出温柔话语
+- 禁止模板化评价
+- 禁止使用Emoji
+- 禁止在JSON前后添加任何markdown代码块标记"""
 
-        print(f"📤 发送给 Coze 的 Prompt:\n{prompt}")
+        print(f"📤 发送给 Coze 的 Prompt（精简版）")
         
         try:
             print(f"📡 请求大模型评价（Level {level}）...")
@@ -721,10 +821,10 @@ class LLMService:
                 print(f"🔄 已使用兜底评价数据")
             
             abilities = parsed_result.setdefault('abilities_change', {})
-            abilities['core_business'] = max(-5, min(5, abilities.get('core_business', 0)))
-            abilities['project_management'] = max(-5, min(5, abilities.get('project_management', 0)))
-            abilities['team_influence'] = max(-5, min(5, abilities.get('team_influence', 0)))
-            abilities['strategic_depth'] = max(-5, min(5, abilities.get('strategic_depth', 0)))
+            abilities['core_business'] = max(-10, min(10, abilities.get('core_business', 0)))
+            abilities['project_management'] = max(-10, min(10, abilities.get('project_management', 0)))
+            abilities['team_influence'] = max(-10, min(10, abilities.get('team_influence', 0)))
+            abilities['strategic_depth'] = max(-10, min(10, abilities.get('strategic_depth', 0)))
             
             skills = parsed_result.setdefault('skills_matrix', {})
             skills['conflict'] = skills.get('conflict', 'locked') if skills.get('conflict') in ['expanded', 'locked'] else 'locked'

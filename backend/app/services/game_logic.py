@@ -5,6 +5,17 @@ from app.services.llm_service import llm_service
 
 class GameManager:
     """游戏状态管理类 - 职场韧性实战系统"""
+
+    # 通关条件：各关卡的对应核心能力阈值
+    PASS_THRESHOLDS = {
+        1: ('core_business', 52),
+        2: ('project_management', 54),
+        3: ('strategic_depth', 56),
+        4: ('team_influence', 58),
+        5: ('core_business', 60),
+        6: ('team_influence', 62),
+        7: ('strategic_depth', 65),
+    }
     
     def __init__(self):
         self.current_turn: int = 1
@@ -112,9 +123,31 @@ class GameManager:
             coin_reward = self._calculate_coin_reward(evaluation.get("abilities_change", {}))
             self.coins = max(0, self.coins + coin_reward)
 
-            # 检查是否通关
+            # 检查是否通关（达到最后一关）
             if self.current_level >= 7:
                 return self._create_game_over_response(evaluation, success=True)
+
+            # 通关条件检查
+            passed, ability_key, threshold, current_val = self._check_pass_condition()
+            if not passed:
+                ability_names = {
+                    'core_business': '核心业务', 'project_management': '项目管理',
+                    'team_influence': '团队协同', 'strategic_depth': '战略思维'
+                }
+                print(f"⛔ 通关条件不满足：{ability_names.get(ability_key, ability_key)}={current_val} < {threshold}")
+                return {
+                    "current_turn": self.current_turn,
+                    "current_level": self.current_level,
+                    "abilities": self.abilities,
+                    "skills": self.skills,
+                    "coins": self.coins,
+                    "evaluation": evaluation,
+                    "current_event": self.current_event,
+                    "game_over": False,
+                    "pass_condition_met": False,
+                    "pass_ability_required": ability_key,
+                    "pass_threshold": threshold
+                }
 
             # 获取下一个事件
             next_event = await llm_service.get_next_event(self.current_level + 1)
@@ -133,7 +166,10 @@ class GameManager:
                 "coins": self.coins,
                 "evaluation": evaluation,
                 "current_event": next_event,
-                "game_over": False
+                "game_over": False,
+                "pass_condition_met": True,
+                "pass_ability_required": "",
+                "pass_threshold": 0
             }
 
         except Exception as e:
@@ -175,9 +211,26 @@ class GameManager:
                 
                 evaluation_to_use = fallback_eval
 
-            # 检查是否通关
+            # 检查是否通关（达到最后一关）
             if self.current_level >= 7:
                 return self._create_game_over_response(evaluation_to_use, success=True)
+
+            # 通关条件检查
+            passed, ability_key, threshold, current_val = self._check_pass_condition()
+            if not passed:
+                return {
+                    "current_turn": self.current_turn,
+                    "current_level": self.current_level,
+                    "abilities": self.abilities,
+                    "skills": self.skills,
+                    "coins": self.coins,
+                    "evaluation": evaluation_to_use,
+                    "current_event": self.current_event,
+                    "game_over": False,
+                    "pass_condition_met": False,
+                    "pass_ability_required": ability_key,
+                    "pass_threshold": threshold
+                }
             
             # 获取下一个事件（使用兜底数据）
             next_event = llm_service._get_default_event(self.current_level + 1)
@@ -193,8 +246,59 @@ class GameManager:
                 "coins": self.coins,
                 "evaluation": evaluation_to_use,
                 "current_event": next_event,
-                "game_over": False
+                "game_over": False,
+                "pass_condition_met": True,
+                "pass_ability_required": "",
+                "pass_threshold": 0
             }
+
+    def _check_pass_condition(self) -> tuple:
+        """检查是否满足通关条件，返回 (是否通过, 能力key, 阈值)"""
+        ability_key, threshold = self.PASS_THRESHOLDS.get(self.current_level, ('core_business', 0))
+        current_val = self.abilities.get(ability_key, 0)
+        return (current_val >= threshold, ability_key, threshold, current_val)
+
+    def _determine_ending(self) -> dict:
+        """根据最终能力值判定结局类型"""
+        vals = self.abilities
+        avg = sum(vals.values()) / 4
+        max_val = max(vals.values())
+        min_val = min(vals.values())
+
+        ability_names = {
+            'core_business': '核心业务',
+            'project_management': '项目管理',
+            'team_influence': '团队协同',
+            'strategic_depth': '战略思维'
+        }
+
+        if all(v >= 70 for v in vals.values()):
+            ending_type = '全才型'
+            title = '六边形战士'
+            description = '你在每一个维度上都展现出了顶级职场人的素养，无论是业务深耕还是战略眼光，都已达到令人仰望的高度。'
+        elif max_val >= 80 and min_val < 40:
+            ending_type = '偏科型'
+            top_ability = max(vals, key=vals.get)
+            title = f'{ability_names[top_ability]}专精者'
+            description = f'你的{ability_names[top_ability]}能力出类拔萃，但其他维度明显薄弱。职场如木桶，短板决定了你的上限。'
+        elif min_val < 35:
+            ending_type = '平庸型'
+            title = '职场路人'
+            description = '你在这次模拟中表现平平，没有突出的优势也没有致命短板——但职场不进则退，平庸是最危险的信号。'
+        elif avg >= 55:
+            ending_type = '精英型'
+            title = '部门中坚'
+            description = '你的综合能力稳扎稳打，虽然尚未达到顶尖水平，但已经具备了独当一面的实力，是团队中不可或缺的中坚力量。'
+        else:
+            ending_type = '均衡型'
+            title = '稳步前行者'
+            description = '你的各项能力发展均衡，虽无特别突出之处，但也没有明显短板。持续积累，未来可期。'
+
+        return {
+            'ending_type': ending_type,
+            'ending_title': title,
+            'ending_description': description
+        }
 
     def _update_abilities(self, abilities_change: Dict[str, int]) -> None:
         """更新玩家能力值"""
@@ -212,17 +316,18 @@ class GameManager:
         """根据AI评价的能力变化动态计算金币奖惩"""
         net_change = sum(abilities_change.values())
         if net_change > 0:
-            # 正面评价：能力上升 → 金币奖励 +50~+200
-            return max(50, min(200, 50 + int(net_change * 7.5)))
+            # 正面评价：能力上升 → 金币奖励
+            return 40 + net_change * 5
         elif net_change < 0:
-            # 负面评价：能力下降 → 金币扣除 -30~-100
-            return -max(30, min(1000, 30 + int(abs(net_change) * 3.5)))
+            # 负面评价：能力下降 → 金币扣除
+            return -(25 + int(abs(net_change) * 2.5))
         else:
-            # 中性评价：保底 +50
-            return 50
+            # 中性评价：保底 +40
+            return 40
 
     def _create_game_over_response(self, evaluation: Dict[str, Any], success: bool = True) -> Dict[str, Any]:
         """创建游戏结束响应"""
+        ending = self._determine_ending()
         return {
             "current_turn": self.current_turn,
             "current_level": self.current_level,
@@ -232,8 +337,10 @@ class GameManager:
             "evaluation": evaluation,
             "current_event": None,
             "game_over": True,
-            "ending_title": "🏆 职业巅峰达成！" if success else "游戏结束",
-            "ending_comment": evaluation.get("comment", "恭喜完成所有职业挑战！")
+            "ending_title": ending['ending_title'],
+            "ending_comment": evaluation.get("comment", "恭喜完成所有职业挑战！"),
+            "ending_type": ending['ending_type'],
+            "ending_description": ending['ending_description']
         }
 
 
