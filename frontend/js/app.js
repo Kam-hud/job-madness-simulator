@@ -289,8 +289,9 @@ async function startGame() {
     const hasSave = restoreGameState();
 
     try {
-        console.log('📡 正在调用 API:', `${API_BASE}/api/start`);
-        const response = await fetch(`${API_BASE}/api/start`, {
+        const startLevel = hasSave ? currentLevel : 1;
+        console.log(`📡 正在调用 API: ${API_BASE}/api/start?level=${startLevel}`);
+        const response = await fetch(`${API_BASE}/api/start?level=${startLevel}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -314,6 +315,8 @@ async function startGame() {
             updateAbilityDisplay('team', abilities.team_influence, 0);
             updateAbilityDisplay('strategy', abilities.strategic_depth, 0);
             updateCoinsDisplay();
+            updateSkills(skills);
+            updateLevel(currentLevel);
             showToast(`已恢复存档：Level ${currentLevel}`, 'info');
         } else if (data.abilities) {
             abilities = { ...data.abilities };
@@ -493,6 +496,10 @@ async function submitAction() {
             elements.submitBtn.textContent = '⚡ 实施职业对策';
         } else {
             SoundFX.play('pass');
+            // 立即更新关卡变量并保存，UI更新延迟到点评展示结束后
+            if (data.current_level) {
+                currentLevel = data.current_level;
+            }
             saveGameState();
             setTimeout(() => {
                 hideComment();

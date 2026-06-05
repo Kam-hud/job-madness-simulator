@@ -42,8 +42,8 @@ async def health_check():
 
 
 @app.post("/api/start", response_class=UTF8JSONResponse)
-async def start_game():
-    return await game_manager.reset_game()
+async def start_game(level: int = 1):
+    return await game_manager.reset_game(start_level=level)
 
 
 @app.post("/api/action", response_class=UTF8JSONResponse)

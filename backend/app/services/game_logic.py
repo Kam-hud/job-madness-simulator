@@ -20,6 +20,7 @@ class GameManager:
     def __init__(self):
         self.current_turn: int = 1
         self.current_level: int = 1
+        self.consecutive_fails: int = 0  # 当前关卡连续失败次数，用于动态降低阈值
         self.abilities = {
             "core_business": 50,
             "project_management": 50,
@@ -38,10 +39,10 @@ class GameManager:
         self.history: List[Dict[str, Any]] = []
         self.current_event: Optional[Dict[str, Any]] = None
 
-    async def reset_game(self) -> Dict[str, Any]:
-        """重置游戏，开始新游戏"""
-        self.current_turn = 1
-        self.current_level = 1
+    async def reset_game(self, start_level: int = 1) -> Dict[str, Any]:
+        """重置游戏，开始新游戏（支持从指定关卡开始）"""
+        self.current_turn = start_level
+        self.current_level = start_level
         self.abilities = {
             "core_business": 50,
             "project_management": 50,
@@ -58,6 +59,7 @@ class GameManager:
         }
         self.coins = 1000
         self.history = []
+        self.consecutive_fails = 0
 
         try:
             first_event = await llm_service.get_next_event(self.current_level)
@@ -107,7 +109,14 @@ class GameManager:
             )
             
             print(f"✅ AI 评价成功：comment={evaluation.get('comment', '')}")
-            print(f"📈 能力变化：{evaluation.get('abilities_change', {})}")
+            print(f"📈 Coze 原始能力变化：{evaluation.get('abilities_change', {})}")
+            
+            # 🔥 后处理：根据点评狠毒程度覆盖 Coze 返回的 abilities_change
+            # Coze AI 经常不遵循"点评越狠能力涨越多"规则，需要在后端强制校准
+            comment = evaluation.get('comment', '')
+            corrected_change = self._calibrate_ability_by_comment(comment)
+            evaluation['abilities_change'] = corrected_change
+            print(f"📈 校准后能力变化：{corrected_change}")
             
             # 检查是否为倦怠状态
             if evaluation.get('is_burnout'):
@@ -130,6 +139,7 @@ class GameManager:
             # 通关条件检查
             passed, ability_key, threshold, current_val = self._check_pass_condition()
             if not passed:
+                self.consecutive_fails += 1
                 ability_names = {
                     'core_business': '核心业务', 'project_management': '项目管理',
                     'team_influence': '团队协同', 'strategic_depth': '战略思维'
@@ -157,6 +167,7 @@ class GameManager:
             self.current_event = next_event
             self.current_level += 1
             self.current_turn += 1
+            self.consecutive_fails = 0  # 通关成功，重置失败计数
 
             return {
                 "current_turn": self.current_turn,
@@ -218,6 +229,7 @@ class GameManager:
             # 通关条件检查
             passed, ability_key, threshold, current_val = self._check_pass_condition()
             if not passed:
+                self.consecutive_fails += 1
                 return {
                     "current_turn": self.current_turn,
                     "current_level": self.current_level,
@@ -237,6 +249,7 @@ class GameManager:
             self.current_event = next_event
             self.current_level += 1
             self.current_turn += 1
+            self.consecutive_fails = 0  # 通关成功，重置失败计数
 
             return {
                 "current_turn": self.current_turn,
@@ -252,11 +265,115 @@ class GameManager:
                 "pass_threshold": 0
             }
 
+    def _calibrate_ability_by_comment(self, comment: str) -> dict:
+        """
+        根据点评的狠毒程度校准能力变化。
+        核心规则：被骂得越狠能力涨越多，敷衍点评则扣分。
+        这个方法是用来强制覆盖 Coze API 返回的不符合规则的 abilities_change。
+        """
+        comment_lower = comment.lower()
+        
+        # 狠毒关键词——点评越狠毒，能力涨越多
+        harsh_keywords = [
+            "不堪", "废物", "可笑", "幼稚", "愚蠢", "无能", "丢人", "垃圾",
+            "不配", "失败", "没用", "活该", "做梦", "天真", "不知", "完全不懂",
+            "令人失望", "毫无", "差劲", "糟糕", "漏洞百出", "自欺欺人",
+            "自以为是", "不值一提", "无可救药", "岂有此理", "荒唐",
+            "糊弄", "应付", "敷衍", "漏洞", "一塌糊涂", "不敢恭维",
+            "自暴自弃", "崩溃", "不堪大用", "扛不住", "退缩",
+            "毫无逻辑", "无脑", "甩锅", "推卸", "逃避", "玻璃心"
+        ]
+        
+        # 敷衍关键词——点评不痛不痒，敷衍了事 → 扣分
+        perfunctory_keywords = [
+            "不错", "还行", "可以", "差不多", "及格", "中规中矩",
+            "尚可", "基本合格", "稳扎稳打", "表现良好", "不错的表现",
+            "温吞", "不冷", "不热", "提不起劲", "沟通技巧",
+            "继续努力", "加油", "再接再厉"
+        ]
+        
+        # 中等力度——有一定批评但不够狠
+        moderate_keywords = [
+            "不足", "不够", "缺乏", "需要改进", "有待提高", "还需",
+            "不够主动", "不够深入", "不够全面", "有欠缺", "欠缺",
+            "没有亮点", "没亮点", "平庸", "普通", "一般般",
+            "仅仅是", "仅此而已", "只是", "只能算", "差强人意",
+            "没看到", "看不到", "不够清晰", "不够具体"
+        ]
+        
+        harsh_count = sum(1 for kw in harsh_keywords if kw in comment_lower)
+        perfunctory_count = sum(1 for kw in perfunctory_keywords if kw in comment_lower)
+        moderate_count = sum(1 for kw in moderate_keywords if kw in comment_lower)
+        
+        print(f"  评论分析: harsh={harsh_count}, moderate={moderate_count}, perfunctory={perfunctory_count}")
+        
+        if harsh_count >= 2:
+            # 狠毒点评 → 大幅涨能力
+            return {
+                "core_business": 8,
+                "project_management": 7,
+                "team_influence": 6,
+                "strategic_depth": 6
+            }
+        elif harsh_count >= 1:
+            # 有一定批评力度
+            return {
+                "core_business": 5,
+                "project_management": 4,
+                "team_influence": 4,
+                "strategic_depth": 3
+            }
+        elif moderate_count >= 2:
+            # 中等力度 → 小幅涨
+            return {
+                "core_business": 3,
+                "project_management": 2,
+                "team_influence": 2,
+                "strategic_depth": 2
+            }
+        elif moderate_count >= 1:
+            # 轻批评
+            return {
+                "core_business": 1,
+                "project_management": 1,
+                "team_influence": 1,
+                "strategic_depth": 1
+            }
+        elif perfunctory_count >= 1:
+            # 敷衍 → 扣分
+            return {
+                "core_business": -5,
+                "project_management": -4,
+                "team_influence": -3,
+                "strategic_depth": -3
+            }
+        else:
+            # 无法判定 → 中性小幅扣分
+            return {
+                "core_business": -2,
+                "project_management": -2,
+                "team_influence": -1,
+                "strategic_depth": -1
+            }
+
     def _check_pass_condition(self) -> tuple:
-        """检查是否满足通关条件，返回 (是否通过, 能力key, 阈值)"""
-        ability_key, threshold = self.PASS_THRESHOLDS.get(self.current_level, ('core_business', 0))
-        current_val = self.abilities.get(ability_key, 0)
-        return (current_val >= threshold, ability_key, threshold, current_val)
+        """检查是否满足通关条件，返回 (是否通过, 能力key, 阈值, 当前值)
+        
+        动态阈值 + 硬兜底机制：
+        1. 每失败一次阈值-2，最低降至50
+        2. 连续失败3次自动放行（避免卡关死循环）
+        通关后重置失败计数。
+        """
+        base_ability_key, base_threshold = self.PASS_THRESHOLDS.get(self.current_level, ('core_business', 0))
+        
+        # 硬兜底：连续失败3次直接放行
+        if self.consecutive_fails >= 3:
+            return (True, base_ability_key, 0, self.abilities.get(base_ability_key, 0))
+        
+        # 动态阈值：每失败一次减2，但不低于50
+        dynamic_threshold = max(50, base_threshold - self.consecutive_fails * 2)
+        current_val = self.abilities.get(base_ability_key, 0)
+        return (current_val >= dynamic_threshold, base_ability_key, dynamic_threshold, current_val)
 
     def _determine_ending(self) -> dict:
         """根据最终能力值判定结局类型"""
