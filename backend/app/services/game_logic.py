@@ -101,6 +101,11 @@ class GameManager:
             print(f"🎮 处理玩家回合 {self.current_turn}，级别 {self.current_level}")
             print(f"🎤 玩家输入：{player_input[:50]}...")
             print(f"💰 当前积分：{self.coins}")
+
+            # 兜底：如果 current_event 未初始化（如直接加载存档），填充默认事件
+            if self.current_event is None:
+                print(f"⚠️ current_event 为空，填充兜底事件")
+                self.current_event = llm_service._get_default_event(self.current_level)
             
             evaluation = await llm_service.evaluate_player_action(
                 situation=self.current_event.get("description", ""),
@@ -111,12 +116,33 @@ class GameManager:
             print(f"✅ AI 评价成功：comment={evaluation.get('comment', '')}")
             print(f"📈 Coze 原始能力变化：{evaluation.get('abilities_change', {})}")
             
-            # 🔥 后处理：根据点评狠毒程度覆盖 Coze 返回的 abilities_change
-            # Coze AI 经常不遵循"点评越狠能力涨越多"规则，需要在后端强制校准
+            # 🔥 后处理：校准 Coze 返回的 abilities_change
+            # 新策略：Coze prompt 已要求教科书→扣分、硬刚→加分，后端做四道防线
             comment = evaluation.get('comment', '')
-            corrected_change = self._calibrate_ability_by_comment(comment)
-            evaluation['abilities_change'] = corrected_change
-            print(f"📈 校准后能力变化：{corrected_change}")
+            abilities = evaluation.get('abilities_change', {})
+            # 兜底评价已由 _determine_ability_change 计算正确值，跳过二次校准
+            if evaluation.get('is_fallback'):
+                print(f"📈 兜底评价（跳过校准）：{abilities}")
+            elif all(v <= 0 for v in abilities.values()) if abilities else False:
+                # Coze 全非正分 → 教科书回答，Coze 已正确给扣分，信任
+                print(f"📈 Coze 全非正分（教科书回答，跳过校准）：{abilities}")
+            elif any(v >= 7 for v in abilities.values()):
+                # Coze 高分 + 点评确实含狠毒词 → 信任 Coze；否则走校准防止误判
+                harsh_check = any(kw in comment for kw in self._get_harsh_keywords())
+                if harsh_check:
+                    print(f"📈 Coze 高分+狠毒点评（跳过校准）：{abilities}")
+                else:
+                    corrected_change = self._calibrate_ability_by_comment(comment)
+                    evaluation['abilities_change'] = corrected_change
+                    print(f"📈 Coze 高分但点评温和，强制校准：{corrected_change}")
+            elif all(v >= 0 for v in abilities.values()) and any(v >= 4 for v in abilities.values()):
+                # Coze 温和加分（+4~+6）→ 半硬刚回答，新 prompt 中的合理区间，信任
+                print(f"📈 Coze 温和加分（半硬刚回答，跳过校准）：{abilities}")
+            else:
+                # 可疑区间：0~+3 或正负混合 → 走校准
+                corrected_change = self._calibrate_ability_by_comment(comment)
+                evaluation['abilities_change'] = corrected_change
+                print(f"📈 可疑区间，校准后：{corrected_change}")
             
             # 检查是否为倦怠状态
             if evaluation.get('is_burnout'):
@@ -265,6 +291,21 @@ class GameManager:
                 "pass_threshold": 0
             }
 
+    # 狠毒关键词——点评越狠毒，能力涨越多
+    _HARSH_KEYWORDS = [
+        "不堪", "废物", "可笑", "幼稚", "愚蠢", "无能", "丢人", "垃圾",
+        "不配", "失败", "没用", "活该", "做梦", "天真", "不知", "完全不懂",
+        "令人失望", "毫无", "差劲", "糟糕", "漏洞百出", "自欺欺人",
+        "自以为是", "不值一提", "无可救药", "岂有此理", "荒唐",
+        "糊弄", "应付", "敷衍", "漏洞", "一塌糊涂", "不敢恭维",
+        "自暴自弃", "崩溃", "不堪大用", "扛不住", "退缩",
+        "毫无逻辑", "无脑", "甩锅", "推卸", "逃避", "玻璃心"
+    ]
+
+    @classmethod
+    def _get_harsh_keywords(cls) -> list:
+        return cls._HARSH_KEYWORDS
+
     def _calibrate_ability_by_comment(self, comment: str) -> dict:
         """
         根据点评的狠毒程度校准能力变化。
@@ -273,16 +314,7 @@ class GameManager:
         """
         comment_lower = comment.lower()
         
-        # 狠毒关键词——点评越狠毒，能力涨越多
-        harsh_keywords = [
-            "不堪", "废物", "可笑", "幼稚", "愚蠢", "无能", "丢人", "垃圾",
-            "不配", "失败", "没用", "活该", "做梦", "天真", "不知", "完全不懂",
-            "令人失望", "毫无", "差劲", "糟糕", "漏洞百出", "自欺欺人",
-            "自以为是", "不值一提", "无可救药", "岂有此理", "荒唐",
-            "糊弄", "应付", "敷衍", "漏洞", "一塌糊涂", "不敢恭维",
-            "自暴自弃", "崩溃", "不堪大用", "扛不住", "退缩",
-            "毫无逻辑", "无脑", "甩锅", "推卸", "逃避", "玻璃心"
-        ]
+        harsh_keywords = self._get_harsh_keywords()
         
         # 敷衍关键词——点评不痛不痒，敷衍了事 → 扣分
         perfunctory_keywords = [
@@ -307,8 +339,11 @@ class GameManager:
         
         print(f"  评论分析: harsh={harsh_count}, moderate={moderate_count}, perfunctory={perfunctory_count}")
         
+        # 长文但零狠毒关键词 + 含温和批评词 → Bot 认真写了长篇温和点评（玩家回答无聊），按敷衍扣分
+        # 不加 moderate_count 前置条件会误伤 Coze 乱码/胡言乱语的回复
+        is_long_but_mild = len(comment) >= 150 and harsh_count == 0 and moderate_count >= 1
+
         if harsh_count >= 2:
-            # 狠毒点评 → 大幅涨能力
             return {
                 "core_business": 8,
                 "project_management": 7,
@@ -316,15 +351,20 @@ class GameManager:
                 "strategic_depth": 6
             }
         elif harsh_count >= 1:
-            # 有一定批评力度
             return {
                 "core_business": 5,
                 "project_management": 4,
                 "team_influence": 4,
                 "strategic_depth": 3
             }
+        elif is_long_but_mild:
+            return {
+                "core_business": -5,
+                "project_management": -4,
+                "team_influence": -3,
+                "strategic_depth": -3
+            }
         elif moderate_count >= 2:
-            # 中等力度 → 小幅涨
             return {
                 "core_business": 3,
                 "project_management": 2,
@@ -332,7 +372,6 @@ class GameManager:
                 "strategic_depth": 2
             }
         elif moderate_count >= 1:
-            # 轻批评
             return {
                 "core_business": 1,
                 "project_management": 1,
@@ -340,7 +379,6 @@ class GameManager:
                 "strategic_depth": 1
             }
         elif perfunctory_count >= 1:
-            # 敷衍 → 扣分
             return {
                 "core_business": -5,
                 "project_management": -4,
@@ -348,7 +386,6 @@ class GameManager:
                 "strategic_depth": -3
             }
         else:
-            # 无法判定 → 中性小幅扣分
             return {
                 "core_business": -2,
                 "project_management": -2,

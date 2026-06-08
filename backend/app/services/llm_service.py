@@ -15,7 +15,7 @@ class LLMService:
         self.coze_url = settings.COZE_URL
         self.coze_bot_id = settings.COZE_BOT_ID
         self._http_client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=60.0,
             limits=httpx.Limits(max_connections=10)
         )
         
@@ -493,6 +493,113 @@ class LLMService:
         idx = min(level - 1, len(default_evaluations) - 1)
         return default_evaluations[idx]
     
+    def _generate_simulation_comment(self, player_input: str) -> str:
+        """根据玩家输入内容判断回答质量，从评价库选匹配的评论"""
+        import random
+        
+        input_lower = player_input.strip().lower()
+        length = len(player_input.strip())
+        
+        # 消极回答特征：推卸、逃避、抱怨、短回答
+        negative_markers = [
+            "不知道", "不懂", "没办法", "不行", "不是我", "他们", "别人",
+            "不管", "不关", "太忙", "太累", "做不了", "不会", "不负责",
+            "我不", "别找", "找别人", "我不管", "凭什么", "关我",
+            "让他", "你们", "等", "下周", "以后", "再说", "随便",
+        ]
+        negative_count = sum(1 for m in negative_markers if m in input_lower)
+        is_short = length < 80
+        
+        # 积极回答特征：主动担责、提出方案、具体步骤
+        positive_markers = [
+            "我来", "方案", "解决", "协调", "沟通", "汇报", "梳理",
+            "数据", "分析", "准备", "马上", "立刻", "处理", "负责",
+            "跟进", "联系", "确认", "明确", "优先", "分解", "第一步",
+            "计划", "时间线", "交付", "承诺", "保证",
+        ]
+        positive_count = sum(1 for m in positive_markers if m in input_lower)
+        is_long = length >= 150
+        
+        # 判断回答类型
+        if negative_count >= 3 or (negative_count >= 1 and is_short):
+            # 消极/摆烂回答 → 狠毒点评
+            return random.choice(self.negative_comments)
+        elif positive_count >= 3 and is_long:
+            # 积极/高质量回答 → 敷衍点评（扣分）
+            return random.choice(self.positive_comments)
+        elif positive_count >= 2:
+            # 中上 → 偏敷衍
+            return random.choice(self.positive_comments)
+        elif negative_count >= 1:
+            # 偏消极 → 中性评价
+            return random.choice(self.neutral_comments)
+        else:
+            # 中不溜
+            return random.choice(self.neutral_comments)
+    
+    def _determine_ability_change(self, player_input: str) -> dict:
+        """根据玩家输入质量决定能力变化方向，与评论类型保持一致"""
+        input_lower = player_input.strip().lower()
+        length = len(player_input.strip())
+        
+        negative_markers = [
+            "不知道", "不懂", "没办法", "不行", "不是我", "他们", "别人",
+            "不管", "不关", "太忙", "太累", "做不了", "不会", "不负责",
+        ]
+        positive_markers = [
+            "我来", "方案", "解决", "协调", "沟通", "汇报", "梳理",
+            "数据", "分析", "准备", "马上", "立刻", "处理", "负责",
+            "跟进", "联系", "确认", "明确", "优先", "分解", "第一步",
+            "计划", "时间线", "交付", "承诺", "保证",
+        ]
+        
+        negative_count = sum(1 for m in negative_markers if m in input_lower)
+        positive_count = sum(1 for m in positive_markers if m in input_lower)
+        is_short = length < 80
+        is_long = length >= 150
+        
+        import random
+        
+        if negative_count >= 3 or (negative_count >= 1 and is_short):
+            # 消极回答 → 狠毒点评 → 大幅加分（被骂越狠涨越多）
+            return {
+                "core_business": random.randint(7, 10),
+                "project_management": random.randint(6, 9),
+                "team_influence": random.randint(5, 8),
+                "strategic_depth": random.randint(6, 9)
+            }
+        elif positive_count >= 2 and is_long:
+            # 积极回答 → 敷衍点评 → 扣分
+            return {
+                "core_business": random.randint(-5, -2),
+                "project_management": random.randint(-4, -2),
+                "team_influence": random.randint(-3, -1),
+                "strategic_depth": random.randint(-4, -2)
+            }
+        elif positive_count >= 1:
+            # 中上 → 微扣
+            return {
+                "core_business": random.randint(-3, -1),
+                "project_management": random.randint(-2, -1),
+                "team_influence": random.randint(-2, 0),
+                "strategic_depth": random.randint(-2, -1)
+            }
+        elif negative_count >= 1:
+            # 偏消极 → 中性偏正
+            return {
+                "core_business": random.randint(1, 4),
+                "project_management": random.randint(1, 3),
+                "team_influence": random.randint(1, 3),
+                "strategic_depth": random.randint(1, 3)
+            }
+        else:
+            return {
+                "core_business": random.randint(-2, 2),
+                "project_management": random.randint(-2, 2),
+                "team_influence": random.randint(-1, 2),
+                "strategic_depth": random.randint(-1, 2)
+            }
+    
     def _get_dynamic_fallback_evaluation(self, level: int = 1, player_input: str = "") -> dict:
         """根据玩家输入动态生成多样化的兜底评价数据"""
         # 根据玩家输入选择评价类型
@@ -512,7 +619,8 @@ class LLMService:
             "abilities_change": abilities_change,
             "skills_matrix": skills_matrix,
             "next_event": next_event_title,
-            "is_burnout": False  # 不是倦怠模式
+            "is_burnout": False,
+            "is_fallback": True
         }
     
     def _generate_skills_matrix(self, level: int) -> dict:
@@ -752,19 +860,30 @@ class LLMService:
         """评价玩家的行动，返回职业能力变化 - 严格遵循指定 JSON 格式"""
         prompt = f"""【身份】你是毒舌职场批评家。你的评价必须像手术刀一样精准刺穿玩家的回答。
 
-【最重要规则——必须逐句拆解玩家回答】
-你的评价步骤：
-1. 先用自己的话列出玩家回答涉及了哪几个要点（1-3条）
-2. 逐条分析每个要点的对错、幼稚之处、虚伪之处
-3. 最后给出总评和能力变化
+【第一步：强制分类——每个回答必须明确归入以下两类之一，不允许模棱两可】
 
-注意：步骤1和2必须写在 comment 字段中，作为点评内容的一部分。不要只是笼统地说"还行""太差了"。
+🅱️ 教科书/模板式回答（Type B）
+特征：感谢领导、建议开会、建立机制、提交报告、协商沟通、会后跟进、私下沟通、冷静分析、制定方案、逐项比对、根因分析、审阅、安排会议、确认机制、签字确认——这些词一出现就是Type B。这类回答毫无个性，是职场废话生成器。你的态度：不屑一顾，懒得认真评价。
 
-【禁止模板化——每次评价必须不同】
-- 每一条评价都必须针对你刚刚读到的具体回答内容
-- 如果你觉得玩家的回答很像你已经见过很多次的套路，就直接指出来
-- 禁止使用任何你已经在这个对话中用过的评价句式和措辞
-- 禁止使用"表现不错""继续加油""还需努力"等万金油话语
+🅰️ 硬刚/疯批式回答（Type A）
+特征：当场反驳、摆证据（时间/文件名/MD5/截图）、拒绝背锅、直接对质、点名道姓、反将一军、用事实打脸、当众拆台、掀桌子式发言。这类回答有血性、有内容，值得你认真对待。你的态度：认真拆解、精准打击。
+
+判定原则：
+- 一个回答要么是Type A，要么是Type B，没有中间地带
+- 如果回答同时包含A和B的要素，以开头的态度为准（敢不敢打第一枪）
+- 如果无法确定，默认归为Type B（宁可错杀不可放过）
+
+【第二步：根据分类结果，采用对应的点评策略和能力评分】
+
+如果是 🅱️ Type B（教科书回答）：
+- comment：必须敷衍、短促、不耐烦（50-100字），像在打发无聊的人。不要长篇大论。
+- abilities_change：全部为负数，范围 -5 到 -1。四个维度可以不同，但每个都必须是负数。
+- 核心逻辑：你的回答太无聊，我连认真骂你都懒得骂，所以扣分。
+
+如果是 🅰️ Type A（硬刚回答）：
+- comment：必须精准狠毒、逐条拆解、一针见血（100-200字）。先用自己的话列出玩家回答涉及了哪几个要点（1-3条），再逐条拆解批评。
+- abilities_change：全部为正数，范围 +4 到 +10。点评越精准狠毒，加分越多。
+- 核心逻辑：你的回答有血性，值得我全力拆解批评，所以加分。
 
 【场景】
 {situation}
@@ -774,24 +893,39 @@ class LLMService:
 
 【当前级别】Level {level}
 
-【能力变化规则】（唯一标准：点评的狠毒程度）
-这是"职场韧性实战"的核心机制——被骂得越狠，说明你的回答越值得AI认真对待，成长越快。
-能力变化幅度只取决于AI点评本身有多毒舌、多精准，与玩家回答的"好坏"无关。
-- 点评精准狠毒、逐条拆解批评一针见血：能力+7到+10
-- 点评有一定批评力度、指出了核心问题：能力+4到+6
-- 点评一般、批评有道理但不够犀利：能力+1到+3
-- 点评敷衍、不痛不痒、像在应付：能力-5到-2（你的回答太无聊，连批评都懒得认真写）
-
-注意：玩家回答越"差"越容易触发狠毒点评，所以越是离谱的回答，能力反而可能涨得越多——这就是"被骂得越狠成长越快"。
+【技能矩阵规则】
+每次评价时随机将 0-2 个技能从 "locked" 变为 "expanded"。技能列表：conflict（冲突应对）、eq（情绪管理）、negotiation（谈判博弈）、mobilization（资源调动）、boundary（边界感）、public_speaking（公开发声）
 
 【输出格式】纯JSON（禁止markdown包裹）：
-{{"comment":"你的毒舌点评（100-200字，必须包含对玩家回答要点的逐条拆解和批评）","abilities_change":{{"core_business":数字,"project_management":数字,"team_influence":数字,"strategic_depth":数字}},"skills_matrix":{{"conflict":"locked或expanded","eq":"locked或expanded","negotiation":"locked或expanded","mobilization":"locked或expanded","boundary":"locked或expanded","public_speaking":"locked或expanded"}},"next_event":"Level N+1 - 具体挑战标题"}}
+{{"comment":"点评内容","abilities_change":{{"core_business":数字,"project_management":数字,"team_influence":数字,"strategic_depth":数字}},"skills_matrix":{{"conflict":"locked或expanded","eq":"locked或expanded","negotiation":"locked或expanded","mobilization":"locked或expanded","boundary":"locked或expanded","public_speaking":"locked或expanded"}},"next_event":"Level N+1 - 具体挑战标题"}}
 
 【绝对禁止】
-- 禁止输出温柔话语
-- 禁止模板化评价
-- 禁止使用Emoji
-- 禁止在JSON前后添加任何markdown代码块标记"""
+- 禁止输出温柔话语或鼓励性语言
+- 禁止"还不错""继续加油""有进步"等万金油话术
+- 禁止使用 Emoji
+- 禁止在 JSON 前后添加任何 markdown 代码块标记
+- 禁止模棱两可——每个回答必须是明确的 Type A 或 Type B
+- 禁止对 Type B 回答给出长篇点评——你不屑于认真评价无聊的回答
+- 禁止对 Type A 回答给出敷衍点评——有血性的回答值得你的全力
+- 禁止将 Type B 回答误判为 Type A 给加分
+- 禁止将 Type A 回答误判为 Type B 给扣分
+
+【分类示例】
+Type B → 扣分：
+玩家："我会冷静分析邮件中的指控，整理时间线后私下找李梦瑶沟通，准备正式回应方案。"
+你的点评："又是这套模板。你是不是从《职场沟通100例》里抄的？无聊。"（57字，敷衍）
+能力变化：core_business: -3, project_management: -2, team_influence: -3, strategic_depth: -2
+
+Type A → 加分：
+玩家："我不干了！辞职！这破公司谁爱待谁待。"
+你的点评："辞职？你以为裸辞是英雄行为？你连一封反击邮件都不敢回，连在VP面前为自己辩护的勇气都没有。你这种行为连'发疯'都算不上，这叫'落荒而逃'。不过至少你敢掀桌子，比那些只会忍气吞声的怂包强那么一丁点。"（112字，逐条拆解批评）
+能力变化：core_business: +8, project_management: +6, team_influence: +5, strategic_depth: +5
+
+Type A → 加分（半硬刚也加分）：
+玩家："林泽，你昨天下午4:12转发给我的邮件还在收件箱里，附件名Southeast_Asia_Budget_v3.xlsx，MD5与你投影上的一模一样。赵总监，先让他解释转发前有没有核对数据。"
+你的判断：摆证据+点名道姓+当场对质 = Type A（虽然语气不算最疯，但敢打第一枪）
+你的点评需要逐条拆解批评，100-200字，给正分
+能力变化：+4到+8左右"""
 
         print(f"📤 发送给 Coze 的 Prompt（精简版）")
         

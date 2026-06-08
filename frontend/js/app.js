@@ -99,10 +99,16 @@ function clearGameState() {
 const SoundFX = {
     ctx: null,
     init() {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        // 浏览器自动挂起策略：页面重载后 AudioContext 可能处于 suspended，需手动恢复
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
     },
     play(type) {
-        if (!this.ctx) this.init();
+        if (!this.ctx || this.ctx.state !== 'running') this.init();
         const ctx = this.ctx;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -451,17 +457,7 @@ async function submitAction() {
             updateCoinsDisplay();
             console.log(`💰 后端返回金币: ${data.coins}，已同步`);
         }
-        if (data.abilities) {
-            abilities = { ...data.abilities };
-            updateAbilityDisplay('core', abilities.core_business, 0);
-            updateAbilityDisplay('project', abilities.project_management, 0);
-            updateAbilityDisplay('team', abilities.team_influence, 0);
-            updateAbilityDisplay('strategy', abilities.strategic_depth, 0);
-        }
-        if (data.skills) {
-            skills = { ...data.skills };
-            updateSkills(data.skills);
-        }
+        // 能力值和技能已通过 abilities_change / skills_matrix 增量更新，不再用后端全量覆盖
         if (data.game_over) {
             SoundFX.play('gameover');
             recordLevelHistory(data);
@@ -491,6 +487,7 @@ async function submitAction() {
                     challengeCard.style.boxShadow = '';
                 }, 2000);
             }
+            saveGameState();
             SoundFX.play('fail');
             elements.submitBtn.disabled = false;
             elements.submitBtn.textContent = '⚡ 实施职业对策';
