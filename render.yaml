@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: job-madness-simulator
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: COZE_API_KEY
+        sync: false
+      - key: COZE_BOT_ID
+        sync: false
+      - key: COZE_URL
+        sync: false
