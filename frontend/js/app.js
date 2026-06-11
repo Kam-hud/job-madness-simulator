@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000';
+const API_BASE = '';
 const LEVEL_NAMES = {
     1: { icon: '🛡️', name: '同事甩锅' },
     2: { icon: '📋', name: '紧急任务' },
