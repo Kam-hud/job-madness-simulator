@@ -5,3 +5,13 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+<<<<<<< HEAD
+=======
+    envVars:
+      - key: COZE_API_KEY
+        sync: false
+      - key: COZE_BOT_ID
+        sync: false
+      - key: COZE_URL
+        sync: false
+>>>>>>> b677c4ffbc4b93ec2c1dc085dbb754964bdf1a0b
